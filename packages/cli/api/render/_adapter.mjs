@@ -50,7 +50,7 @@ import {climbsOut, findPackageRoot, isInside as liesInside, requireCoreDir} from
 import {runChoice} from '../../foundation/release/run-context.mjs';
 import {isAlive, pidSpace} from '../../foundation/release/cache.mjs';
 import {isServedPackage} from '../../foundation/render/served-packages.mjs';
-import {hostedRun, recordResolved, servingRootPackages} from '../../foundation/runtime/package-root.mjs';
+import {hostedPagePackages, recordResolved} from '../../foundation/runtime/package-root.mjs';
 
 export {PAGE_EXTENSIONS, embeddedPathProblem};
 
@@ -435,16 +435,6 @@ function asAstryxError(e) {
 }
 
 /**
- * The packages besides Astryx, React and StyleX that a page outside a project
- * takes from the package set: the integrations the host approves, and the
- * other packages its set declares, such as the icon library templates import.
- * @returns {string[]}
- */
-function servedExtras() {
-  return [...(hostedRun()?.integrations ?? []), ...servingRootPackages()];
-}
-
-/**
  * The package set the CLI runs from, for a page outside a project
  * (architecture:cli-surface INV30): the Core it carries, found by the rule of
  * every command that answers from Core outside a project. Inside a project
@@ -460,7 +450,7 @@ function servedSet(input) {
   const dir = path.dirname(input);
   if (runChoice(dir).inProject) return null;
   try {
-    return {dir: requireCoreDir(dir), integrations: servedExtras()};
+    return {dir: requireCoreDir(dir), integrations: hostedPagePackages()};
   } catch (e) {
     const err = /** @type {any} */ (e);
     return err?.code === ERROR_CODES.ERR_VERSIONS_UNAVAILABLE ? {unavailable: err} : null;
@@ -491,7 +481,7 @@ export async function renderToFile({cwd, input, output, title, absolute = false}
       const detail = /** @type {any} */ (e)?.code === 'ERR_RENDER_MISSING_DEPENDENCY' ? /** @type {any} */ (e).detail : null;
       /** @type {unknown[]} */
       const missing = Array.isArray(detail?.packages) ? detail.packages : [detail?.package];
-      const served = servedExtras();
+      const served = hostedPagePackages();
       if (set && 'unavailable' in set && missing.some(name => typeof name === 'string' && isServedPackage(name, served))) {
         throw new AstryxError(set.unavailable.message, [], ERROR_CODES.ERR_VERSIONS_UNAVAILABLE);
       }
