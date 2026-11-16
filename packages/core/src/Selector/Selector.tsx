@@ -77,7 +77,10 @@ import {useCombobox, useSelectedItemOverlayMargin} from './hooks';
 import {useMenuPress} from '../hooks/useMenuPress';
 import {useMenuOverflow} from '../DropdownMenu/useMenuOverflow';
 import {useTypeahead} from '../hooks/useTypeahead';
-import {useResolvedOptionality} from '../hooks/useResolvedRequired';
+import {
+  resolveSearchTriggerRequired,
+  useResolvedOptionality,
+} from '../hooks/useResolvedRequired';
 import {SelectorOption} from './SelectorOption';
 import {SelectorRowLayoutContext} from './SelectorRowLayoutContext';
 import {getInputARIA, isImeKeyEvent, mergeProps} from '../utils';
@@ -110,7 +113,6 @@ import type {AdaptivePresentation} from '../hooks/useAdaptivePresentation';
 import {SelectorBottomSheet} from './SelectorBottomSheet';
 import {useSelectorPresentation} from './useSelectorPresentation';
 import {selectorPresentationStyles} from './selectorPresentation.stylex';
-import {useSearchTriggerRequired} from './useSearchTriggerRequired';
 import type {FieldStatusPlacement} from '../Field/fieldStatusPlacement';
 import {
   registerEnglishFallback,
@@ -1268,17 +1270,7 @@ export function Selector<T extends SelectorOptionType>(
   const fieldLabelId = useId();
   const inputLabelId = useId();
   const readOnlyDescriptionId = useId();
-  const {ariaRequired, requiredDescriptionId, requiredDescription} =
-    useSearchTriggerRequired({
-      hasSearch,
-      isReadOnly: isEffectivelyReadOnly,
-      isRequired: isEffectivelyRequired,
-      isLabelRequiredMarkerShown,
-      isInInputGroup: inputGroup != null,
-      ariaLabel: (rest as {'aria-label'?: string})['aria-label'],
-      ariaLabelledBy: ariaLabelledByProp,
-      requiredLabel: t('@astryx.field.required'),
-    });
+  const requiredDescriptionId = useId();
   const searchId = useId();
   const valueTextId = useId();
   // Measure from the same outer control that usePopover anchors to; using the
@@ -2155,6 +2147,15 @@ export function Selector<T extends SelectorOptionType>(
     callerAriaLabel != null && ariaLabelledByProp == null
       ? triggerId
       : (triggerLabelledBy ?? (inputGroup ? undefined : fieldLabelId));
+  const {ariaRequired, hasRequiredDescription} = resolveSearchTriggerRequired({
+    hasSearch,
+    isReadOnly: isEffectivelyReadOnly,
+    isRequired: isEffectivelyRequired,
+    showsRequiredMarker: isLabelRequiredMarkerShown,
+    isInInputGroup: inputGroup != null,
+    ariaLabel: callerAriaLabel,
+    ariaLabelledBy: ariaLabelledByProp,
+  });
   const isValueInTriggerName =
     hasSearch &&
     !isEffectivelyReadOnly &&
@@ -2262,7 +2263,11 @@ export function Selector<T extends SelectorOptionType>(
     id: triggerId,
     // A caller's description is kept alongside the field's own.
     'aria-describedby':
-      [ariaDescribedByProp, ariaDescribedBy, requiredDescriptionId]
+      [
+        ariaDescribedByProp,
+        ariaDescribedBy,
+        hasRequiredDescription ? requiredDescriptionId : null,
+      ]
         .filter(Boolean)
         .join(' ') || undefined,
     'aria-labelledby': isValueInTriggerName
@@ -2363,7 +2368,11 @@ export function Selector<T extends SelectorOptionType>(
             {t('@astryx.input.readOnly')}
           </VisuallyHidden>
         )}
-        {requiredDescription}
+        {hasRequiredDescription && (
+          <VisuallyHidden id={requiredDescriptionId}>
+            {t('@astryx.field.required')}
+          </VisuallyHidden>
+        )}
         <button
           {...triggerSharedProps}
           ref={triggerButtonRef}
