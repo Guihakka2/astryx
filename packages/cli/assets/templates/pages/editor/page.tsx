@@ -18,6 +18,7 @@ import {
   LayoutContent,
   LayoutHeader,
   LayoutPanel,
+  StackItem,
 } from '@astryxdesign/core/Layout';
 import {Icon} from '@astryxdesign/core/Icon';
 import {List, ListItem} from '@astryxdesign/core/List';
@@ -539,25 +540,29 @@ function BlockPreview({
       const items = (props.items as Transaction[]) || [];
       return (
         <Card padding={6} style={cardStyle} onClick={onSelect}>
-          <HStack gap={3} vAlign="start" hAlign="between" paddingBlockEnd={4}>
-            <VStack gap={1}>
-              <Heading level={3}>
-                {(props.heading as string) || 'Features'}
-              </Heading>
-              {(props.description as string) && (
-                <Text type="supporting" color="secondary">
-                  {props.description as string}
-                </Text>
-              )}
-            </VStack>
-            <Button label="View All" variant="secondary" size="sm" />
-          </HStack>
-          <Table
-            data={items}
-            columns={TRANSACTION_COLUMNS}
-            idKey="id"
-            hasHover
-          />
+          <VStack gap={4}>
+            <HStack gap={3} vAlign="start" hAlign="between">
+              <VStack gap={1}>
+                <Heading level={3}>
+                  {(props.heading as string) || 'Features'}
+                </Heading>
+                {(props.description as string) && (
+                  <Text type="supporting" color="secondary">
+                    {props.description as string}
+                  </Text>
+                )}
+              </VStack>
+              <StackItem>
+                <Button label="View All" variant="secondary" size="sm" />
+              </StackItem>
+            </HStack>
+            <Table
+              data={items}
+              columns={TRANSACTION_COLUMNS}
+              idKey="id"
+              hasHover
+            />
+          </VStack>
         </Card>
       );
     }

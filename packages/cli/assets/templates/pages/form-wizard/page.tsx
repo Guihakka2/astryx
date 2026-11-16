@@ -170,8 +170,10 @@ const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 // sizing to their own contents, which is what keeps the step counter on the
 // page's centre line. Without the zero basis the counter drifts by half the
 // difference between the zones — most visibly on the last step, where the
-// primary button's label grows from "Next" to "Create workspace".
-const footerZone: CSSProperties = {flexBasis: 0};
+// primary button's label grows from "Next" to "Create workspace". The floor
+// keeps a zone from squeezing its buttons below their labels on a phone; the
+// counter gives up the centre line there instead.
+const footerZone: CSSProperties = {flexBasis: 0, minWidth: 'max-content'};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -396,17 +398,19 @@ export default function FormWizardPage() {
               <StackItem size="fill">
                 <Heading level={1}>Create workspace</Heading>
               </StackItem>
-              <Button
-                label="Cancel"
-                variant="ghost"
-                onClick={() =>
-                  // Demo only: replace this toast with the call that performs the action.
-                  showToast({
-                    body: 'Demo: leaving workspace setup would return you to the app here',
-                    uniqueID: 'cancel-workspace',
-                  })
-                }
-              />
+              <StackItem>
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  onClick={() =>
+                    // Demo only: replace this toast with the call that performs the action.
+                    showToast({
+                      body: 'Demo: leaving workspace setup would return you to the app here',
+                      uniqueID: 'cancel-workspace',
+                    })
+                  }
+                />
+              </StackItem>
             </HStack>
             {/* Indicators sit on the track, and the steps carry a label
                 only. A pinned header pays for every line it keeps, and a

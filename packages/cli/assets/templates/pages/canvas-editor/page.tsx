@@ -1265,7 +1265,13 @@ function DocumentTab({
 
   return (
     <Item
-      label={tab.name}
+      // A one-line Text truncates the name like Item's own string label, and
+      // shows the full name in a tooltip only when it is cut.
+      label={
+        <Text type="body" color="inherit" maxLines={1}>
+          {tab.name}
+        </Text>
+      }
       density="compact"
       isSelected={isActive}
       onClick={onSelect}

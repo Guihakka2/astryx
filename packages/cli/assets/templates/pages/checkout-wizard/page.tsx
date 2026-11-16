@@ -225,6 +225,10 @@ const POSTAL_CODE_RULES: Record<
 // Plain inline styles over Astryx token CSS variables, so the template compiles
 // in a project with no StyleX pipeline.
 
+// The forward button never gives up its label: once the row cannot seat both
+// buttons at their full labels, it wraps to a line of its own and spans it.
+const forwardButtonSlot: CSSProperties = {minWidth: 'max-content'};
+
 // The summary column holds its width while the form column takes the rest, and
 // pins itself as the form scrolls past — the sticky offset is the page inset,
 // so a stuck card sits where an unstuck one would. The narrow summary needs no
@@ -641,13 +645,15 @@ export default function CheckoutWizardPage() {
           forward path is the wider target without either button changing size.
           Every control on this page is the default size; emphasis here comes
           from width, which is the axis the row has to spare. */}
-      <HStack gap={3} vAlign="center" width="100%">
-        <Button
-          label={step === 0 ? 'Continue shopping' : 'Back'}
-          variant="secondary"
-          onClick={() => setStep(s => Math.max(0, s - 1))}
-        />
-        <StackItem size="fill">
+      <HStack gap={3} vAlign="center" width="100%" wrap="wrap">
+        <StackItem>
+          <Button
+            label={step === 0 ? 'Continue shopping' : 'Back'}
+            variant="secondary"
+            onClick={() => setStep(s => Math.max(0, s - 1))}
+          />
+        </StackItem>
+        <StackItem size="fill" style={forwardButtonSlot}>
           <Button
             label={isLastStep ? `Pay ${money(total)}` : 'Continue'}
             variant="primary"
@@ -831,11 +837,13 @@ export default function CheckoutWizardPage() {
                             }
                           />
                         </StackItem>
-                        <Button
-                          label="Apply"
-                          variant="secondary"
-                          onClick={applyPromo}
-                        />
+                        <StackItem>
+                          <Button
+                            label="Apply"
+                            variant="secondary"
+                            onClick={applyPromo}
+                          />
+                        </StackItem>
                       </HStack>
                     </VStack>
                   )}
