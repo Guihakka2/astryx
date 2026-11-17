@@ -334,6 +334,10 @@ const PRIVATE_SYSTEM_VARS = new Set([
   // gives its block padding only to a direct first or last Table.
   '--_container-bleed-block-start',
   '--_container-bleed-block-end',
+  // spec:AST-025 FR22: an adopter of the shared scroll-edge fade sets the
+  // clear band at the edge and the fade length on its viewport.
+  '--_scroll-fade-inset',
+  '--_scroll-fade-length',
 ]);
 
 const CROSS_COMPONENT_VARS: Record<string, string[]> = {
