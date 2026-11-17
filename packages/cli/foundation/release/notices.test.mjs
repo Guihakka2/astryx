@@ -537,13 +537,23 @@ describe('cliUpdateStep', () => {
       command: `${lag?.install}, then ${lag?.upgrade}`,
       runs: false,
     });
-    // Not known yet: the same step, at the latest release.
+    // Not known yet: the same step, at the latest release, and a project
+    // that pins Core to one version keeps its pins.
     expect(cliUpdateStep({cwd: app, self, stateDir: tempDir('state')})).toEqual(
       {
         command:
-          'npm install @astryxdesign/core@latest @astryxdesign/cli@latest, then npx astryx upgrade --from 0.7.1 --apply',
+          'npm install -E @astryxdesign/core@latest @astryxdesign/cli@latest, then npx astryx upgrade --from 0.7.1 --apply',
         runs: false,
       },
+    );
+    // A project that declares a range keeps a range.
+    const ranged = project(tempDir(), {'@astryxdesign/core': '^0.7.1'});
+    writeJson(path.join(ranged, 'package-lock.json'), {lockfileVersion: 3});
+    installCore(ranged, '0.7.1');
+    expect(
+      cliUpdateStep({cwd: ranged, self, stateDir: tempDir('state')}).command,
+    ).toBe(
+      'npm install @astryxdesign/core@latest @astryxdesign/cli@latest, then npx astryx upgrade --from 0.7.1 --apply',
     );
   });
 
@@ -559,7 +569,7 @@ describe('cliUpdateStep', () => {
       stateDir: tempDir('state'),
     });
     expect(command).toBe(
-      `cd ${app} && npm install @astryxdesign/core@latest @astryxdesign/cli@latest, then cd ${app} && npx astryx upgrade --from 0.7.1 --apply`,
+      `cd ${app} && npm install -E @astryxdesign/core@latest @astryxdesign/cli@latest, then cd ${app} && npx astryx upgrade --from 0.7.1 --apply`,
     );
   });
 
@@ -595,11 +605,28 @@ describe('cliUpdateStep', () => {
       name: '@astryxdesign/cli',
       version: '0.7.2',
     });
+    const dlx = getDlxPrefix(outside);
+    // The run's own command after the newest release (the runner the run
+    // came through, its user agent, else npx).
     expect(
-      cliUpdateStep({cwd: outside, self: {version: '0.7.2', root: runner}}),
+      cliUpdateStep({
+        cwd: outside,
+        self: {version: '0.7.2', root: runner},
+        argv: ['theme', 'palette', 'generate', 'my palette.json'],
+      }),
     ).toEqual({
-      // The runner the run came through (its user agent), else npx.
-      command: `${getDlxPrefix(outside)} @astryxdesign/cli@latest`,
+      command: `${dlx} @astryxdesign/cli@latest theme palette generate 'my palette.json'`,
+      runs: true,
+    });
+    // With no arguments to repeat, a place for the command.
+    expect(
+      cliUpdateStep({
+        cwd: outside,
+        self: {version: '0.7.2', root: runner},
+        argv: [],
+      }),
+    ).toEqual({
+      command: `${dlx} @astryxdesign/cli@latest <command>`,
       runs: true,
     });
   });

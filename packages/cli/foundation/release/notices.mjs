@@ -48,6 +48,7 @@ import {
   getCliInvocation,
   getDlxPrefix,
   installDependenciesCommand,
+  quoteCommandArgument,
 } from '../env/package-manager.mjs';
 import {CLI_ROOT, findAstryxProject, findPackageRoot} from '../fs/paths.mjs';
 import {readDeclaredDependencies} from '../integrations/declared-dependencies.mjs';
@@ -401,7 +402,7 @@ const ADD = {
  * Core, its CLI) to one version, as a starter does, keeps its packages
  * pinned: npm saves a version it adds as a range unless it is told to save it
  * exactly, so the command carries that flag when `version` is one version. A
- * range is saved as the range.
+ * range is saved as the range. `latest` names one release too: the newest.
  * @param {string} root
  * @param {string | null} [version]
  * @returns {string}
@@ -409,7 +410,7 @@ const ADD = {
 export function addVerbFor(root, version = null) {
   const pm = detectPackageManager(root);
   const add = ADD[pm] ?? ADD.npm;
-  if (!pinnedVersion(version)) return add;
+  if (version !== 'latest' && !pinnedVersion(version)) return add;
   const facts = readReleaseFacts(root);
   if (!pinnedVersion(facts.declaredCoreRange ?? facts.declaredCliRange)) {
     return add;
@@ -706,20 +707,26 @@ export function addCliCommand(root, version) {
  * project's folder. Outside a project, the copy that ran updates: a global
  * copy by the package manager that holds it (see
  * {@link globalUpgradeCommand}); a package runner's copy by running the
- * newest release (`runs`), as nothing installed it.
- * @param {{cwd: string, self?: {version: string, root: string}, stateDir?: string}} options
+ * newest release (`runs`), with the run's own arguments (`<command>` when
+ * there are none to repeat), as nothing installed it.
+ * @param {{cwd: string, self?: {version: string, root: string}, stateDir?: string, argv?: string[]}} options
  * @returns {{command: string, runs: boolean}}
  */
 export function cliUpdateStep({
   cwd,
   self = runningCopy(CLI_ROOT),
   stateDir = userConfigDir(),
+  argv = process.argv.slice(2),
 }) {
   const target = installFolder(cwd);
   if (target == null) {
-    return isGlobalCopy(self.root)
-      ? {command: globalUpgradeCommand(self.root), runs: false}
-      : {command: `${getDlxPrefix(cwd)} ${LATEST}`, runs: true};
+    if (isGlobalCopy(self.root)) {
+      return {command: globalUpgradeCommand(self.root), runs: false};
+    }
+    const args = argv.length
+      ? argv.map(arg => quoteCommandArgument(arg)).join(' ')
+      : '<command>';
+    return {command: `${getDlxPrefix(cwd)} ${LATEST} ${args}`, runs: true};
   }
   const root = target.moved
     ? target.dir
@@ -727,7 +734,7 @@ export function cliUpdateStep({
   const current = projectRelease(root)?.version ?? self.version;
   const lag = projectLag({cwd, current, stateDir});
   if (lag) return {command: `${lag.install}, then ${lag.upgrade}`, runs: false};
-  const add = `${addVerbFor(root)} ${withCoreAt(root, 'latest')}`;
+  const add = `${addVerbFor(root, 'latest')} ${withCoreAt(root, 'latest')}`;
   const upgrade = `${getCliInvocation(root, {installed: true})} upgrade --from ${current} --apply`;
   return {
     command: target.moved

@@ -19,6 +19,8 @@ import {paletteFiles, paletteMapping} from '../../../theme-edit/_palette.mjs';
 import {themePaletteGenerate} from './generate.mjs';
 import {PALETTE_RECIPES} from './generator.mjs';
 import {newerRecipe} from './newer-recipe.mjs';
+import {cliUpdateStep} from '../../../../foundation/release/notices.mjs';
+import {cliVersion} from '../../../../foundation/release/run-context.mjs';
 
 /** @type {string} */
 let cwd;
@@ -64,15 +66,12 @@ describe('a palette a newer CLI made', () => {
       themePaletteGenerate('palette.config.json', {}, {cwd}),
     );
     expect(error.code).toBe(ERROR_CODES.ERR_PALETTE_GENERATION);
-    expect(error.message).toContain(
-      `palette.config.json was made with a newer Astryx CLI: its colors use the ${NEWER} recipe`,
+    // The whole message, with the step that fits where this CLI runs.
+    const step = cliUpdateStep({cwd});
+    expect(error.message).toBe(
+      `palette.config.json was made with a newer Astryx CLI: its colors use the ${NEWER} recipe, and this CLI (${cliVersion()}) knows ${PALETTE_RECIPES.join(', ')}. ${step.runs ? 'Run the command again with the newest CLI' : 'Update the CLI, then run the command again'}: ${step.command}. Nothing was changed.`,
     );
-    expect(error.message).toContain(`knows ${PALETTE_RECIPES.join(', ')}`);
-    // The step fits where the CLI runs: this folder is in no project.
-    expect(error.message).toMatch(
-      /\. (Update the CLI, then run the command again|Run the command again with the newest CLI): .*@astryxdesign\/cli@latest\. Nothing was changed\.$/,
-    );
-    expect(error.suggestions?.[0]?.name).toMatch(/@astryxdesign\/cli@latest$/);
+    expect(error.suggestions?.[0]?.name).toBe(step.command);
   });
 
   it('the theme editor names the recipe and the update', () => {
@@ -122,7 +121,7 @@ describe('a palette a newer CLI made', () => {
       paletteMapping(cwd, 'saved', data, undefined, {}),
     );
     expect(error.message).toMatch(
-      /Update the CLI, then run the command again: npm install @astryxdesign\/core@\S+ @astryxdesign\/cli@\S+, then npx astryx upgrade --from 0\.7\.1 --apply\. Nothing was changed\.$/,
+      /Update the CLI, then run the command again: npm install -E @astryxdesign\/core@\S+ @astryxdesign\/cli@\S+, then npx astryx upgrade --from 0\.7\.1 --apply\. Nothing was changed\.$/,
     );
   });
 
