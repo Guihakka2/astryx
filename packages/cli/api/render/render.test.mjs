@@ -2455,6 +2455,27 @@ describe('render(): a page outside a project', () => {
     expect(html).not.toContain('data:image/png');
   }, 60_000);
 
+  it('names public/ from the page\'s folder in a missing-image warning, also for a stylesheet in another folder', () => {
+    const site = path.join(away, 'public-from-page');
+    fs.mkdirSync(path.join(site, 'public'), {recursive: true});
+    fs.mkdirSync(path.join(site, 'src/pages/p'), {recursive: true});
+    fs.mkdirSync(path.join(site, 'src/styles'), {recursive: true});
+    fs.writeFileSync(path.join(site, 'src/styles/a.css'), '.hero { background: url(/gone-bg.png); }\n');
+    fs.writeFileSync(
+      path.join(site, 'src/pages/p/page.tsx'),
+      "import '../../styles/a.css';\nexport default function Page() {\n  return <main className=\"hero\"><img src=\"/gone.png\" alt=\"\" /></main>;\n}\n",
+    );
+    const run = runBin(site, ['experimental', 'render', 'src/pages/p/page.tsx']);
+    expect(run.status).toBe(0);
+    const missing = run.json.data.warnings.filter((/** @type {any} */ w) => w.code === 'missing-asset').map((/** @type {any} */ w) => w.message);
+    expect(missing).toEqual(
+      expect.arrayContaining([
+        "/gone.png was not found in ../../../public/, where a path from the site's root is read, so it is left as is and will not show.",
+        "/gone-bg.png was not found in ../../../public/, where a path from the site's root is read, so it is left as is and will not show.",
+      ]),
+    );
+  }, 60_000);
+
   it('finishes when the folder it runs in is the filesystem root and no public/ is above the page', () => {
     const lone = path.join(away, 'from-root');
     fs.mkdirSync(lone, {recursive: true});

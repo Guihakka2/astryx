@@ -8,5 +8,6 @@
 - The file now carries each such image with the page's other files, so `--reverse` puts it back in the `public/` folder render read, at the same path.
 - An image the page names this way but draws only later (after a click, in the next view) is carried too, and the file's script shows it from the carried data.
 - Render reads such a path only from `public/`. A file of that name at the project's or the page's root is no longer read, and a path that leaves `public/` (`/../x.png`) is not read. A path to a file that is not in `public/` gets the missing-image warning, which now names the `public/` folder render searched.
+- The experimental theme editor's image notes read a theme's `url(/…)` file the same way: a file at the project's root, not in `public/`, is now reported as missing.
 
 @josephfarina

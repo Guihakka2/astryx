@@ -847,11 +847,12 @@ export function assetRef(ref, at) {
 
 /**
  * The public/ folder a `/` path is read from, as a path from the page's
- * folder (`public/`, `../../public/`).
- * @param {{dir: string, root: string}} at
+ * folder (`public/`, `../../public/`), whichever file names it: the page or
+ * a stylesheet in another folder.
+ * @param {{dir: string, root: string, pageDir?: string}} at
  */
 function publicFolderOf(at) {
-  const rel = path.relative(at.dir, path.join(at.root, 'public')).split(path.sep).join('/');
+  const rel = path.relative(at.pageDir ?? at.dir, path.join(at.root, 'public')).split(path.sep).join('/');
   return `${rel}/`;
 }
 
@@ -860,7 +861,7 @@ function publicFolderOf(at) {
  * link (`href`) loads nothing, so it is left alone.
  * @param {string} text markup or CSS
  * @param {'html' | 'css'} kind
- * @param {{dir: string, root: string, warnings: RenderWarning[], counted: Set<string>, localAssets: Set<string>, leaveLargeStyleAssets?: boolean, rewrites?: Map<string, string>}} ctx
+ * @param {{dir: string, pageDir?: string, root: string, warnings: RenderWarning[], counted: Set<string>, localAssets: Set<string>, leaveLargeStyleAssets?: boolean, rewrites?: Map<string, string>}} ctx
  *   `leaveLargeStyleAssets`: a stylesheet's file too large to inline is left
  *   as it is and named, as a missing one is, rather than refused;
  *   `rewrites`: each attribute value the markup's rewrite replaced, as the
@@ -1110,6 +1111,9 @@ export async function renderPage(entry, options = {}) {
 
   const ctx = {
     dir,
+    // A stylesheet's own folder replaces `dir` for its url()s; a warning
+    // still names folders from the page's.
+    pageDir: dir,
     root: site,
     warnings,
     counted: new Set(),
