@@ -41,6 +41,7 @@ import type {IconVariant} from './index';
 import {mergeProps} from '../utils/mergeProps';
 import {mergeRefs} from '../utils/mergeRefs';
 import {themeProps} from '../utils/themeProps';
+import {isDrawnIconValue} from './iconSlotValue';
 import {useIconSize} from './IconDefaultSizeContext';
 import {iconSizeStyles, type IconSize} from './IconSize.stylex';
 
@@ -471,15 +472,9 @@ export function renderIconSlot(
   icon: React.ReactNode | IconType,
   props?: {size?: IconSize; color?: IconColor},
 ): React.ReactNode {
-  if (typeof icon === 'string') {
-    return <Icon icon={icon as IconName} {...props} />;
-  }
-
-  if (
-    typeof icon === 'function' ||
-    (typeof icon === 'object' && icon !== null && 'render' in icon)
-  ) {
-    return <Icon icon={icon as unknown as IconType} {...props} />;
-  }
-  return icon;
+  return isDrawnIconValue(icon) ? (
+    <Icon icon={icon as IconName | IconType} {...props} />
+  ) : (
+    icon
+  );
 }

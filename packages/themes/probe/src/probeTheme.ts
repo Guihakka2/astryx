@@ -6,7 +6,7 @@
 // test fixture. Regenerate with: pnpm visual:probe-theme
 //
 // defineTheme takes six things and this covers all six:
-//   components  276 targets, 901 selectors (generated from the docs)
+//   components  277 targets, 904 selectors (generated from the docs)
 //   tokens      custom properties, read back off the themed element
 //   icons       every registry entry swapped for a marked glyph
 //   indicators  check / radio / checkbox swapped — the swap that reaches furthest
@@ -4361,6 +4361,26 @@ export const probeTheme = defineTheme({
         color: 'hsl(291.4 77% 12%)',
         borderColor: 'hsl(9.7 73% 25%)',
         outlineColor: 'hsl(39.4 88% 25%)',
+      },
+    },
+    'side-nav-item-icon': {
+      base: {
+        backgroundColor: 'hsl(13.4 86% 56%)',
+        color: 'hsl(218.6 85% 12%)',
+        borderColor: 'hsl(325.0 93% 25%)',
+        outlineColor: 'hsl(162.8 75% 25%)',
+      },
+      selected: {
+        backgroundColor: 'hsl(347.9 75% 59%)',
+        color: 'hsl(192.2 92% 12%)',
+        borderColor: 'hsl(62.8 79% 25%)',
+        outlineColor: 'hsl(189.0 78% 25%)',
+      },
+      disabled: {
+        backgroundColor: 'hsl(274.8 84% 51%)',
+        color: 'hsl(106.4 87% 12%)',
+        borderColor: 'hsl(136.2 91% 25%)',
+        outlineColor: 'hsl(84.1 86% 25%)',
       },
     },
     'side-nav-section': {
