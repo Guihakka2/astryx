@@ -15,6 +15,13 @@ import {MAX_ASSET_BYTES} from './assets.mjs';
 /** How long one image may take, from the request to its last byte. */
 export const REMOTE_IMAGE_TIMEOUT_MS = 5000;
 
+/**
+ * How long a request may wait for its first answer. A request with no answer
+ * by then most often never gets one: the machine has no network, or the
+ * name does not resolve.
+ */
+export const REMOTE_IMAGE_ANSWER_MS = 2000;
+
 /** How long all the images of one render may take together. */
 export const REMOTE_IMAGES_BUDGET_MS = 15000;
 
@@ -57,11 +64,12 @@ export function imageTypeOf(bytes) {
  * The remote images of one render. `get` fetches the addresses no earlier
  * call fetched, and `results` holds every answer by the address as the page
  * wrote it.
- * @param {{fetch?: typeof globalThis.fetch, timeoutMs?: number, budgetMs?: number, maxBytes?: number}} [options]
+ * @param {{fetch?: typeof globalThis.fetch, timeoutMs?: number, answerMs?: number, budgetMs?: number, maxBytes?: number}} [options]
  */
 export function remoteImages({
   fetch = globalThis.fetch,
   timeoutMs = REMOTE_IMAGE_TIMEOUT_MS,
+  answerMs = REMOTE_IMAGE_ANSWER_MS,
   budgetMs = REMOTE_IMAGES_BUDGET_MS,
   maxBytes = MAX_ASSET_BYTES,
 } = {}) {
@@ -72,17 +80,43 @@ export function remoteImages({
   let timer = null;
   const tooBig = `larger than ${maxBytes / 1048576} MB, the most a rendered page carries of one file`;
   const late = 'the render ran out of the time it gives remote images';
+  const notAsked =
+    'not asked: the network answered none of the first images the render asked for';
+  // Requests the network answered (any answer, an error status included),
+  // and requests it never answered. Once a request goes unanswered while
+  // none has an answer, the next request waits for every one in flight; if
+  // they all end with no answer, the machine has no network, so the render
+  // asks for no more.
+  let answered = 0;
+  let unanswered = 0;
+  let inFlight = 0;
+  /** @type {(() => void)[]} */
+  let waiting = [];
+  /** @type {WeakSet<AbortController>} */
+  const gotAnswer = new WeakSet();
+  const noNetwork = () => answered === 0 && unanswered > 0;
+  /** Resolves when no request is in flight. */
+  const settled = () =>
+    inFlight === 0
+      ? Promise.resolve()
+      : new Promise(resolve => {
+          waiting.push(() => resolve(undefined));
+        });
 
   /**
-   * Why a request failed: its own time limit, the render's, or the network.
+   * Why a request failed: its own time limits, the render's, or the network.
    * @param {AbortController} request
    */
-  const failure = request =>
-    budget.signal.aborted
-      ? late
-      : request.signal.aborted
-        ? `no answer within ${timeoutMs / 1000} s`
-        : 'the network could not reach it';
+  const failure = request => {
+    if (budget.signal.aborted) return late;
+    if (gotAnswer.has(request)) {
+      return `the image did not arrive within ${timeoutMs / 1000} s`;
+    }
+    unanswered++;
+    return request.signal.aborted
+      ? `no answer within ${Math.min(answerMs, timeoutMs) / 1000} s`
+      : 'the network could not reach it';
+  };
 
   /**
    * @param {string} url as the page wrote it
@@ -104,16 +138,24 @@ export function remoteImages({
           'the address holds a user name or password, which a render never sends',
       };
     if (budget.signal.aborted) return {reason: late};
-    // One request's own time limit, and the render's for every image.
+    if (noNetwork()) return {reason: notAsked};
+    // One request's own time limits, and the render's for every image.
     const request = new AbortController();
     const stopRequest = () => request.abort();
     const limit = setTimeout(stopRequest, timeoutMs);
     budget.signal.addEventListener('abort', stopRequest, {once: true});
+    inFlight++;
     try {
       return await read(parsed, request);
     } finally {
       clearTimeout(limit);
       budget.signal.removeEventListener('abort', stopRequest);
+      inFlight--;
+      if (inFlight === 0) {
+        const done = waiting;
+        waiting = [];
+        for (const resolve of done) resolve();
+      }
     }
   }
 
@@ -125,6 +167,7 @@ export function remoteImages({
   async function read(parsed, request) {
     /** @type {Response} */
     let response;
+    const noAnswer = setTimeout(() => request.abort(), answerMs);
     try {
       response = await fetch(parsed.href, {
         credentials: 'omit',
@@ -135,7 +178,11 @@ export function remoteImages({
       });
     } catch {
       return {reason: failure(request)};
+    } finally {
+      clearTimeout(noAnswer);
     }
+    gotAnswer.add(request);
+    answered++;
     const stop = () => response.body?.cancel().catch(() => {});
     if (!response.ok) {
       stop();
@@ -193,7 +240,9 @@ export function remoteImages({
       }
       let next = 0;
       const worker = async () => {
-        while (next < wanted.length) {
+        for (;;) {
+          if (noNetwork()) await settled();
+          if (next >= wanted.length) return;
           const url = wanted[next++];
           results.set(url, await one(url));
         }
