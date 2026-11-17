@@ -282,6 +282,12 @@ use` or `theme remove` on a theme that is not added MUST fail and name the
      that does not name it);
   10. no two added themes write different rules outside their own theme scope
       for the same selector, because every added stylesheet loads at once.
+  11. a default theme drawn for one mode (its page color dark in both modes,
+      or light in both) has its page painted: `AppShell` renders, an `html`,
+      `body` or `:root` background uses `--color-background-body`, or the root
+      `Theme` takes the theme's recorded mode; otherwise a warning, never a
+      failure, whose fix is to use `AppShell` or add
+      `body { background: var(--color-background-body) }` to global CSS.
 
   Each failure names the exact command that fixes it.
 

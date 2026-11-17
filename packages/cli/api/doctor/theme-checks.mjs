@@ -2285,7 +2285,7 @@ function oneModePageCheck(projectDir, theme) {
     if (generatedThemeFile(source)) continue;
     if (path.extname(file) === '.css') {
       if (
-        /(?:^|[}\s,])(?:html|body|:root)\s*(?:,[^{]*)?\{[^}]*\bbackground(?:-color)?\s*:/i.test(
+        /(?:^|[}\s,])(?:html|body|:root)\s*(?:,[^{]*)?\{[^}]*\bbackground(?:-color)?\s*:[^;}]*var\(\s*--color-background-body\b/i.test(
           source,
         )
       ) {
@@ -2294,13 +2294,22 @@ function oneModePageCheck(projectDir, theme) {
       }
       continue;
     }
+    // (AppShell from the package or its own entry, as the templates
+    // import it.)
     if (
       source.includes('AppShell') &&
       doctorRendersElement(file, {
-        sources: new Set(['@astryxdesign/core']),
+        sources: new Set(['@astryxdesign/core', '@astryxdesign/core/AppShell']),
         name: 'AppShell',
       })
     ) {
+      painted = true;
+      break;
+    }
+    // (A theme whose one mode the module records, passed to the root
+    // Theme as `themeModes[…]`: Theme sets that mode, so the page follows
+    // it in every OS mode.)
+    if (theme.mode && /\bthemeModes\s*\[/.test(source)) {
       painted = true;
       break;
     }
@@ -2311,14 +2320,14 @@ function oneModePageCheck(projectDir, theme) {
         id: 'theme-page-color',
         label: 'Page color for a one-mode theme',
         status: 'pass',
-        message: `${theme.slug} is drawn for ${mode} mode, and the app paints its page (AppShell or a body background).`,
+        message: `${theme.slug} is drawn for ${mode} mode, and the app paints its page (AppShell, a body background of the page color, or the theme's own mode on its root Theme).`,
       }
     : {
         id: 'theme-page-color',
         label: 'Page color for a one-mode theme',
         status: 'warn',
-        message: `${theme.slug} is drawn for ${mode} mode only, and nothing paints the app's page: no AppShell renders and no stylesheet gives the body a background. In ${other} OS mode its text sits on the browser's own page color.`,
-        fix: "Wrap the page in AppShell; if you can't, add `body { background: var(--color-background-body) }` to global CSS (the purity check flags any stylesheet, so prefer AppShell).",
+        message: `${theme.slug} is drawn for ${mode} mode only, and nothing paints the app's page: no AppShell renders, no stylesheet gives the body the page color, and the root Theme is not given the theme's mode. In ${other} OS mode its text sits on the browser's own page color.`,
+        fix: "Wrap the page in AppShell; if you can't, pass the theme's mode to the root Theme (mode={themeModes[defaultThemeSlug]}), or add `body { background: var(--color-background-body) }` to global CSS (the purity check flags any stylesheet, so prefer AppShell).",
       };
 }
 

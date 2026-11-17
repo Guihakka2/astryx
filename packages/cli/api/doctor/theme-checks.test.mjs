@@ -2024,7 +2024,7 @@ describe('app-theme doctor checks', () => {
     expect(result).toMatchObject({status: 'warn'});
     expect(result.message).toContain('drawn for dark mode only');
     expect(result.fix).toMatch(
-      /^Wrap the page in AppShell; if you can't, add `body \{ background: var\(--color-background-body\) \}` to global CSS/,
+      /^Wrap the page in AppShell; if you can't, pass the theme's mode to the root Theme \(mode=\{themeModes\[defaultThemeSlug\]\}\), or add `body \{ background: var\(--color-background-body\) \}` to global CSS/,
     );
   });
 
@@ -2040,6 +2040,34 @@ describe('app-theme doctor checks', () => {
       check(await checkAppThemes(shell.dir), 'theme-page-color'),
     ).toMatchObject({status: 'pass'});
 
+    const subpath = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(subpath.dir, 'src/App.tsx'),
+      "import {AppShell} from '@astryxdesign/core/AppShell';\nexport const App = () => <AppShell />;\n",
+    );
+    expect(
+      check(await checkAppThemes(subpath.dir), 'theme-page-color'),
+    ).toMatchObject({status: 'pass'});
+
+    // (The theme's recorded mode, passed to the root Theme.)
+    const moded = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(moded.packageDir, 'dist/ocean.js'),
+      'export const oceanTheme = {name: \'ocean\', tokens: {}};\nexport const colorModes = ["dark"];\n',
+    );
+    await themeAdd('ocean', {
+      cwd: moded.dir,
+      import: true,
+      package: '@acme/themes',
+    });
+    write(
+      path.join(moded.dir, 'src/App.tsx'),
+      "import {Theme} from '@astryxdesign/core/theme';\nimport {themes, themeModes, defaultThemeSlug} from './astryx-themes';\nexport const App = () => <Theme theme={themes[defaultThemeSlug]} mode={themeModes[defaultThemeSlug]} />;\n",
+    );
+    expect(
+      check(await checkAppThemes(moded.dir), 'theme-page-color'),
+    ).toMatchObject({status: 'pass'});
+
     const body = await fixture([{slug: 'ocean', css}]);
     write(
       path.join(body.dir, 'src/global.css'),
@@ -2048,6 +2076,19 @@ describe('app-theme doctor checks', () => {
     expect(
       check(await checkAppThemes(body.dir), 'theme-page-color'),
     ).toMatchObject({status: 'pass'});
+  });
+
+  it('counts only a body background that uses the page color', async () => {
+    const {dir} = await fixture([
+      {
+        slug: 'ocean',
+        css: '[data-astryx-theme="ocean"] { --color-background-body: #101314; }\n',
+      },
+    ]);
+    write(path.join(dir, 'src/global.css'), 'body { background: white; }\n');
+    expect(check(await checkAppThemes(dir), 'theme-page-color')).toMatchObject({
+      status: 'warn',
+    });
   });
 
   it('adds no page check for a theme with a light and a dark page', async () => {
