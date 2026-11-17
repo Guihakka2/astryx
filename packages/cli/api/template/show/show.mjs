@@ -11,7 +11,6 @@
 import * as fs from 'node:fs';
 import {AstryxError} from '../../error.mjs';
 import {ERROR_CODES} from '../../../foundation/response/error-codes.mjs';
-import {renderTokens} from '../../../foundation/doc-compiler/links.mjs';
 import {
   componentsInSource,
   pkgOf,
@@ -55,7 +54,7 @@ export function templateShow(match, {iconSets = NO_ICON_SETS} = {}) {
     package: pkgOf(match),
     data: {
       template: match.dirName,
-      description: renderTokens(match.description),
+      description: match.description,
       type: match.type,
       components: componentsInSource(source),
       source,

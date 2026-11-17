@@ -35,7 +35,11 @@ import {templateShow} from './show/show.mjs';
 import {templateSkeleton} from './skeleton/skeleton.mjs';
 import {templateCopy} from './copy/copy.mjs';
 import {templateCdn} from './cdn/cdn.mjs';
-import {loadTemplateIconSets, withOtherCommandHint} from './_adapter.mjs';
+import {
+  linkTemplateDescriptions,
+  loadTemplateIconSets,
+  withOtherCommandHint,
+} from './_adapter.mjs';
 
 // Re-export the shared discovery/IO + cross-command helpers so this module
 // stays the single import surface for the template family (same exports as
@@ -206,7 +210,10 @@ async function templateRead(name, options = {}) {
         : await discoverAll(cwd);
 
   if (list || (!name && !skeleton)) {
-    return templateList(templates, {type, package: packageFilter});
+    return linkTemplateDescriptions(
+      templateList(templates, {type, package: packageFilter}),
+      cwd,
+    );
   }
 
   // Resolve `name` to a single template. Without an explicit package, an active
@@ -277,14 +284,14 @@ async function templateRead(name, options = {}) {
   const match = candidates[0];
 
   if (skeleton) {
-    return templateSkeleton(match, templates);
+    return linkTemplateDescriptions(templateSkeleton(match, templates), cwd);
   }
 
   // The project's icon set decides how the template's icons are written
   // (AST-084 FR9): both the printed source and the copied file follow it.
   const iconSets = await loadTemplateIconSets(cwd);
   if (show || !targetPath) {
-    return templateShow(match, {iconSets});
+    return linkTemplateDescriptions(templateShow(match, {iconSets}), cwd);
   }
 
   // The command as typed selects the same template again, an integration
