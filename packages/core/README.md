@@ -7,7 +7,7 @@ Core UI components, theme system, and utilities for the Astryx design system. Fo
 > ```bash
 > npx @astryxdesign/cli build "<what you are building>"   # the template, blocks and components to start from
 > npx @astryxdesign/cli component <Name>                  # one component's props, variants and examples
-> npx @astryxdesign/cli doctor                            # checks the setup and the code you wrote
+> npx @astryxdesign/cli doctor --built .                  # checks the setup and the code you wrote
 > ```
 >
 > The `.doc.mjs` files in this package are only part of what the CLI knows: it also has page templates, blocks and checks that no source file shows. To keep the CLI in the project, install it at Core's version, then run `init`:
