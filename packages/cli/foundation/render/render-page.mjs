@@ -65,6 +65,7 @@ export {MODULE_EXTENSIONS, PAGE_EXTENSIONS} from './embedded-files.mjs';
  * @property {number} classes - Distinct class names in the markup.
  * @property {number} cssBytes - Bytes of inlined CSS.
  * @property {number} markupBytes - Bytes of rendered markup.
+ * @property {number} sourceBytes - Bytes of the embedded source block.
  * @property {number} images - Local files inlined as data: URIs.
  * @property {RenderWarning[]} warnings
  * @property {{name: string, dir: string}[]} fromSet - Packages that came from the package set the CLI runs from, not the page's folder.
@@ -1471,6 +1472,8 @@ export async function renderPage(entry, options = {}) {
   const body = script ? `<div id="${ROOT_ID}">${markup}</div>` : markup;
   const scriptTag = drawn ? `<script>${drawn}</script>\n` : '';
   let html;
+  /** The embedded source block. */
+  let block;
   if (options.output) {
     // The charset and generator metas come first: a browser reads the
     // charset only from the first 1024 bytes, and a CLI decides whether a
@@ -1540,19 +1543,21 @@ export async function renderPage(entry, options = {}) {
         ).toString('base64'),
       },
     };
+    block = sourceBlock(path.basename(entry), embedded, record);
     html =
       `<!doctype html><html lang="en"${rootThemeAttrs(markup)}><head><meta charset="utf-8">${generator}\n${headerNote(facts)}\n` +
       '<meta name="viewport" content="width=device-width,initial-scale=1">' +
       '<meta name="color-scheme" content="light dark">' +
       `<title>${escapeHtml(title)}</title>${style}</head><body>${body}` +
-      `${sourceBlock(path.basename(entry), embedded, record)}\n${endNote(facts)}\n${scriptTag}</body></html>\n`;
+      `${block}\n${endNote(facts)}\n${scriptTag}</body></html>\n`;
   } else {
+    block = sourceBlock(path.basename(entry), embedded);
     html =
       `<!doctype html><html lang="en"${rootThemeAttrs(markup)}><head><meta charset="utf-8">` +
       '<meta name="viewport" content="width=device-width,initial-scale=1">' +
       '<meta name="color-scheme" content="light dark">' +
       `${generator}<title>${escapeHtml(title)}</title>${style}</head><body>${body}` +
-      `${sourceBlock(path.basename(entry), embedded)}${scriptTag}</body></html>\n`;
+      `${block}${scriptTag}</body></html>\n`;
   }
   return {
     html,
@@ -1561,6 +1566,7 @@ export async function renderPage(entry, options = {}) {
     classes: used.size,
     cssBytes: Buffer.byteLength(css),
     markupBytes: Buffer.byteLength(markup),
+    sourceBytes: Buffer.byteLength(block),
     images: new Set([
       ...[...ctx.counted]
         .filter(k => k.startsWith('file:'))

@@ -50,6 +50,8 @@
  * @property {string[]} data.stylesheets - Package stylesheets that were cut to the rules the page uses and inlined.
  * @property {number} data.classes - Distinct class names in the markup.
  * @property {number} data.cssBytes - Size of the inlined CSS.
+ * @property {number} data.markupBytes - Size of the rendered markup, the page's inlined images included.
+ * @property {number} data.sourceBytes - Size of the embedded source that `--reverse` reads.
  * @property {number} data.images - Local files inlined as data: URIs.
  * @property {RenderWarning[]} data.warnings - Empty when nothing looked wrong.
  * @property {number} data.scriptBytes - Size of the page's script, which `bytes` includes.
