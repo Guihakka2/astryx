@@ -1222,7 +1222,7 @@ describe('generateThemeRules with an explicit Heading weight prop', () => {
 
 describe('derived var expansion', () => {
   describe('a radius of each corner', () => {
-    const rule = (name: string, card: Record<string, string | number>) =>
+    const rule = (name: string, card: Record<string, string>) =>
       generateThemeRules(
         defineTheme({name, components: {card: {base: card}}}),
       ).find(r => r.includes('.astryx-card')) ?? '';
@@ -1253,7 +1253,7 @@ describe('derived var expansion', () => {
 
     it('writes a corner longhand to its own corner variable, after the radius it follows', () => {
       const css = rule('test-corners-longhand', {
-        borderRadius: 0,
+        borderRadius: '0',
         borderStartStartRadius: '20px',
         borderBottomRightRadius: '6px',
       });
