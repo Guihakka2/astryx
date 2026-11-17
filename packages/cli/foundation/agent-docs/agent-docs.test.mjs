@@ -345,6 +345,16 @@ describe('generateCompressedIndex', () => {
     );
   });
 
+  it('names the one-file share route right after the workflow', () => {
+    const block = generateCompressedIndex('1.0.0', {topics: []});
+    const share =
+      'Share a page as one file (opens anywhere, controls work): `astryx experimental export <page.tsx>`; `--reverse` gets the source back.';
+    expect(block).toContain(share);
+    expect(block.indexOf(share)).toBeLessThan(block.indexOf('RULES:'));
+    const withDoctor = generateCompressedIndex('1.0.0', {topics: [], builtCheck: true});
+    expect(withDoctor).toContain(`don't deliver it if it fails.\n${share}\n`);
+  });
+
   it('caps the configured project at 32 integration lines', () => {
     const agentDocs = Array.from({length: 5}, (_, packageIndex) => ({
       package: `@acme/package-${packageIndex}`,

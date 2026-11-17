@@ -95,6 +95,14 @@ export {
 } from './agent-docs-target.mjs';
 
 const MAX_PROJECT_AGENT_DOC_LINES = 32;
+
+/**
+ * How to share a page as one file. Agents asked to share a page otherwise
+ * hand-build their own single HTML file, whose controls do not work.
+ */
+const SHARE_LINE =
+  'Share a page as one file (opens anywhere, controls work): `astryx experimental export <page.tsx>`; `--reverse` gets the source back.';
+
 const MANAGED_MARKER_TEXT = /(?:ASTRYX|XDS):(START|END)/u;
 
 /** @param {unknown} value @returns {string} */
@@ -672,6 +680,7 @@ export function generateCompressedIndex(
   if (builtCheck) {
     lines.push("Before you deliver a build, run `astryx doctor --built <dir>`; don't deliver it if it fails.");
   }
+  lines.push(SHARE_LINE);
   lines.push('');
 
   // Rules — the top error-preventers.
