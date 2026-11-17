@@ -57,7 +57,7 @@ This table is a review projection; the body below is authoritative.
 Pagination presents controls for moving through pages and may let people choose
 a page size or enter a page directly. It owns the page arithmetic, which
 controls render for each variant, the page-change pipeline and announcement,
-and its four local theming targets. Consumer usage lives in
+and its seven local theming targets. Consumer usage lives in
 `Pagination.doc.mjs`.
 
 ## Compatibility and migration
@@ -83,6 +83,9 @@ Consumer migration instructions belong in consumer docs and release notes.
 - The Dot, Page input label, and Page input total parts and their current
   `pagination-dot`, `pagination-input-label`, and `pagination-input-total`
   targets.
+- The control row and its `pagination-list` target, the `pagination-item`
+  target its Button controls carry beside Button's own, and the
+  `pagination-ellipsis` target (FR20, DEC-4).
 - Choosing which stable controls and readouts render for the current paging
   configuration.
 - Page-count arithmetic, step clamping, the page range with ellipses, and the
@@ -135,12 +138,14 @@ Consumer migration instructions belong in consumer docs and release notes.
 | FR17 | A plain activation of a page link runs FR6, with the same `onChange(page)` call as a button control. Pagination does not cancel the click, so the link navigates, and the caller does not navigate in `onChange` for it. The browser follows the URL that was activated: the page change gives a Previous or Next link its next URL only after the click is over. A click that does not navigate this document runs none of FR6, because the page here did not change: a click with a modifier key (Control, Meta, Shift, or Alt), a click on a link whose `target` is set and is not `_self`, and a click on a link whose URL is rejected.                                                                                                                                                                                                                                                                                                                                                                                                                                                              | DEC-1; DEC-3; current tests                                                                              |
 | FR18 | The dots (FR9), the Page input (FR10), and the Page-size selector (FR11) are never links (DEC-2). With `getPageHref` they keep FR9 to FR11 and change the page through FR6. In the `dots` and `input` variants only Previous, Next, First, and Last are links. `onChange` receives the page alone from every control (DEC-3), so it does not tell a link, which navigates, from a dot or the Page input, which do not. A page-size choice calls `onPageSizeChange(size)` and then `onChange(1)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | DEC-2; DEC-3; current tests                                                                              |
 | FR19 | Button replaces the element of a control that stops or starts being a link (`component:Button` FR11): a link that becomes unavailable, at a boundary or while `isDisabled`, is a disabled button, and that button is a link when the control is available again. When the element that leaves holds focus, Pagination moves the focus to the element that replaces it in the same change, through Core's shared owner of that replacement (`architecture:react-component-runtime` INV16). The focus indicator follows the last input: it shows after a key press and not after a pointer press (`architecture:interaction-modality` INV1). The control then holds focus as a button control does (FR13; `spec:AST-085` FR4, FR7). Pagination moves no focus for a control that did not hold it, and none when another element holds focus after the change.                                                                                                                                                                                                                                              | `spec:AST-085` FR4, FR7; `component:Button` FR11; current source and tests                               |
-| FR20 | The control row carries `pagination-list` with `data-variant` and `data-size`. Each Button control in it (page numbers, previous and next, first and last) carries `pagination-item`, and the current page's reflects `data-selected="selected"` beside its `aria-current="page"`; an ellipsis carries `pagination-ellipsis`. A theme styles the row as one joined strip (its border, radius and shadow, a border between cells, the current cell's fill and a cell's hover) through these targets, apart from other Buttons (DEC-4). With no theme rule, Pagination looks as before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Current source and `Pagination.targets.test.tsx`                                                         |
+| FR20 | The control row carries `pagination-list` with `data-variant` and `data-size`. Each Button control in it (page numbers, previous and next, first and last) carries `pagination-item`, and the current page's reflects `data-selected="selected"` beside its `aria-current="page"`; an ellipsis carries `pagination-ellipsis`. A theme styles the row as one joined strip through these targets, apart from other Buttons (DEC-4): the row's border, radius and shadow, and the ellipsis. A cell's own entries (a border between cells, its hover, the current cell's fill) take effect where the theme's `button` entries do not set the same property: a theme `button` entry keyed on variant, size or elevation outranks a `pagination-item` entry on the cells. With no theme rule, Pagination looks as before.                                                                                                                                                                                                                                                                                      | Current source and `Pagination.targets.test.tsx`                                                         |
 
 ### Allowed variation
 
-- **AV1 — Theme paint.** Themes may restyle the local targets; delegated
-  controls follow their own targets.
+- **AV1 — Theme paint.** Themes may restyle the local targets. The Button
+  controls also follow Button's own target, which they carry beside
+  `pagination-item` (FR20); the other delegated controls follow their own
+  targets.
 - **AV2 — Custom variants.** None. The variant axis MUST be closed
   (`architecture:component-theming-surface` INV14). Implementation gap: the
   variant map is open to module augmentation, and an augmented variant renders
@@ -207,9 +212,10 @@ Consumer migration instructions belong in consumer docs and release notes.
 | Page input total      | Presents the known total after the editable page field.              | Current source and public docs | Supporting     | FR2, FR10          |
 
 The three Button rows are separate stable controls with different conditions and
-jobs; they do not create Pagination-owned Button targets. Presentation values,
-size, disabled state, and active state remain capabilities on owning targets,
-not anatomy entries.
+jobs. Each carries the Pagination-owned `pagination-item` target beside Button's
+own (FR20), and the current page's reflects `data-selected`. Presentation
+values, size, and disabled state remain capabilities on Button's target, not
+anatomy entries.
 
 ### Theming anatomy
 
@@ -282,6 +288,7 @@ control behavior and anatomy, and a theme reaches them as Pagination's cells
 | FR16, FR17          | `Pagination.test.tsx` page-links cases; `PaginationLinks.a11y.browser.spec.ts` (the URL that the browser follows)                                                                                                                                                                                                                                                                                                                      | Each Button control; step; page-size argument; `as` and `LinkProvider`; boundary, disabled, and cursor; plain, modified, and `target` clicks; a rejected URL   | A missing link, a URL for an unavailable control, a wrong page size, an ignored `as` or `LinkProvider`, a followed URL other than the activated one, a link click without one `onChange(page)`, or a page change from a modified, other-`target`, or rejected-URL click fails. Evidence gap: no real-browser modified click. | `audit:Pagination/behavior`      |
 | FR18                | `Pagination.test.tsx` page-links cases for the dots, the page box, and the selector                                                                                                                                                                                                                                                                                                                                                    | `dots` and `input` with `getPageHref`; a page-size choice                                                                                                      | A dot or page box that renders a link or does not call `onChange(page)`, or a page-size choice that reports out of order, fails.                                                                                                                                                                                             | `audit:Pagination/behavior`      |
 | FR19                | `Pagination.test.tsx` cases under "focus on a control that stops or starts being a link"; `PaginationLinks.a11y.browser.spec.ts` in Chromium and WebKit                                                                                                                                                                                                                                                                                | Each Button control at a boundary; `isDisabled` on and off; a caller-set page; a page that arrives late; a link component; focus elsewhere; key and pointer    | Focus on the document body after a focused control stops or starts being a link fails. Focus taken by a control that did not hold it fails. A focus ring after a pointer press fails.                                                                                                                                        | `audit:Pagination/accessibility` |
+| FR20                | `Pagination.targets.test.tsx` (the row, every Button cell, the one selected cell beside `aria-current`, the ellipsis); `themingTargets.test.ts`                                                                                                                                                                                                                                                                                        | —                                                                                                                                                              | —                                                                                                                                                                                                                                                                                                                            | —                                |
 | PR1, AR1–AR5        | PR1 has no test (evidence gap). AR1 to AR5 are covered by the FR1, FR6, FR7, FR9, FR10, and FR13 rows.                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                                                              | —                                                                                                                                                                                                                                                                                                                            | `audit:Pagination/accessibility` |
 | Theming anatomy map | `scripts/check-knowledge.mjs`                                                                                                                                                                                                                                                                                                                                                                                                          | Canonical anatomy and current targets                                                                                                                          | Missing, extra, or stale mappings fail repository validation.                                                                                                                                                                                                                                                                | `audit:Pagination/theming`       |
 
@@ -346,7 +353,7 @@ own second parameter stops compiling.
 ### DEC-4 — The control row and its cells are Pagination's own targets
 
 **Reference:** `component:Pagination/DEC-4`
-**Decider:** maintainers (HQ, under Joey's delegation), `2026-11-17`
+**Decider:** `josephfarina` (HQ, under his delegation), `2026-11-17`
 
 A theme draws the controls as one joined strip, as some design systems do: the
 row has the border, radius and shadow, cells are separated by a border, and
@@ -359,10 +366,16 @@ reflects `data-variant` and `data-size` as the root does. Each attribute is
 public because a theme selects on it (`architecture:public-component-api`
 DEC-2).
 
+The cells carry `pagination-item` beside Button's own `button` target, on the
+same element, so a theme `button` entry keyed on variant, size or elevation
+outranks a `pagination-item` entry there. A cell entry takes effect where the
+theme's Button entries leave that property unset.
+
 ## Open questions
 
 - **OQ1 — Which focused tests should pin placement and reflected properties for
-  the four local Pagination targets?** (`checkable`)
+  the seven local Pagination targets?** (`checkable`) `Pagination.targets.test.tsx`
+  pins the three FR20 targets.
 
 ## Content boundary
 
