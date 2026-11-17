@@ -319,14 +319,30 @@ const elevationStyles = stylex.create({
  * Overlay is stacked on top of base color using multiple linear-gradients
  * Focus outline is shared across variants for consistent keyboard affordance.
  */
+/**
+ * A filled button's hover and press paint: its own label colour over the
+ * fill. The page overlay tints one way only (darker in light mode, lighter in
+ * dark), so it vanishes on a fill already at that end, such as a near-black
+ * or a pale accent. The label always contrasts with its fill, so a tint toward
+ * it shows on any fill. A theme's own button rule for these tokens still
+ * wins.
+ */
+const FILLED_HOVER_PAINT = 'color-mix(in srgb, currentColor 12%, transparent)';
+const FILLED_PRESSED_PAINT =
+  'color-mix(in srgb, currentColor 20%, transparent)';
+
 const variants = stylex.create({
   primary: {
     backgroundColor: colorVars['--color-accent'],
     color: colorVars['--color-on-accent'],
+    [colorVars['--color-overlay-hover'] as string]: FILLED_HOVER_PAINT,
+    [colorVars['--color-overlay-pressed'] as string]: FILLED_PRESSED_PAINT,
   },
   secondary: {
     backgroundColor: colorVars['--color-neutral'],
     color: colorVars['--color-text-primary'],
+    [colorVars['--color-overlay-hover'] as string]: FILLED_HOVER_PAINT,
+    [colorVars['--color-overlay-pressed'] as string]: FILLED_PRESSED_PAINT,
   },
   ghost: {
     backgroundColor: 'transparent',
@@ -335,6 +351,8 @@ const variants = stylex.create({
   destructive: {
     backgroundColor: colorVars['--color-error'],
     color: colorVars['--color-on-error'],
+    [colorVars['--color-overlay-hover'] as string]: FILLED_HOVER_PAINT,
+    [colorVars['--color-overlay-pressed'] as string]: FILLED_PRESSED_PAINT,
     // Forced colors replace the fill with ButtonFace; the solid-variant edge
     // (`forcedColorsEdge`) keeps the destructive fill's shape visible
     // (architecture:theme-tokens INV11), in this color. A border, not an
