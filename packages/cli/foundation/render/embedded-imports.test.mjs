@@ -69,3 +69,24 @@ describe('reachableFiles: paths from the site root', () => {
     expect(reachableFiles([file('src/page.tsx', climbs), file('public/pics/a.png')]).missing).toEqual([]);
   });
 });
+
+describe('reachableFiles: the public/ folder the render read', () => {
+  /** @param {string} p @param {string} text */
+  const file = (p, text = '') => ({path: p, base64: Buffer.from(text).toString('base64')});
+  const tree = [
+    file('src/pages/p/page.tsx', 'export default () => <img src="/pics/a.png" alt="" />;\n'),
+    file('src/public/other.png'),
+    file('public/pics/a.png'),
+  ];
+
+  it('expects the file in the public/ the render recorded, not a nearer one', () => {
+    expect(reachableFiles(tree, {publicDir: 'public'}).missing).toEqual([]);
+  });
+
+  it('falls back to the nearest public/ for a file with no record, or a record that is not a plain tree path', () => {
+    expect(reachableFiles(tree).missing).toEqual(['src/public/pics/a.png']);
+    for (const publicDir of ['../public', '/public', 'public/../src/public', 'nowhere', 7]) {
+      expect(reachableFiles(tree, {publicDir}).missing).toEqual(['src/public/pics/a.png']);
+    }
+  });
+});

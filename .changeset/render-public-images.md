@@ -2,6 +2,11 @@
 '@astryxdesign/cli': patch
 ---
 
-[experimental] `astryx experimental render`: an image named by a path from the site's root (`/pics/shoe.png`) shows in the file. Render reads it from the project's `public/` folder. When the project has none, it reads it from the nearest `public/` above the page, inside the project (or, outside a project, inside the folder you run the command from). The file carries the image with the page's other files, so `--reverse` puts it back under `public/` at the same path. A path that leaves `public/` (`/../x.png`) is not read. A path to a file that is not in `public/` gets the missing-image warning, as before.
+[experimental] `astryx experimental render`: more images named by a path from the site's root (`/pics/shoe.png`) show in the file and come back with `--reverse`.
+
+- When the project has no `public/` folder, render reads such a path from the nearest `public/` above the page, inside the project. This covers a site folder below a shared package.json. Outside a project, it reads it from the nearest `public/` above the page, inside the folder you run the command from.
+- The file now carries each such image with the page's other files, so `--reverse` puts it back in the `public/` folder render read, at the same path.
+- An image the page names this way but draws only later (after a click, in the next view) is carried too, and the file's script shows it from the carried data.
+- Render reads such a path only from `public/`. A file of that name at the project's or the page's root is no longer read, and a path that leaves `public/` (`/../x.png`) is not read. A path to a file that is not in `public/` gets the missing-image warning, which now names the `public/` folder render searched.
 
 @josephfarina

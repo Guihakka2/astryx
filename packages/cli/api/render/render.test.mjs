@@ -2447,12 +2447,23 @@ describe('render(): a page outside a project', () => {
     expect(run.json.data.files).toEqual(['page.tsx']);
     const missing = run.json.data.warnings.filter((/** @type {any} */ w) => w.code === 'missing-asset').map((/** @type {any} */ w) => w.message);
     expect(missing).toEqual([
-      '/../secret.png was not found next to the page, so it is left as is and will not show.',
-      '/top.png was not found next to the page, so it is left as is and will not show.',
-      '/gone.png was not found next to the page, so it is left as is and will not show.',
+      "/../secret.png was not found in public/, where a path from the site's root is read, so it is left as is and will not show.",
+      "/top.png was not found in public/, where a path from the site's root is read, so it is left as is and will not show.",
+      "/gone.png was not found in public/, where a path from the site's root is read, so it is left as is and will not show.",
     ]);
     const html = fs.readFileSync(path.join(site, 'page.html'), 'utf8');
     expect(html).not.toContain('data:image/png');
+  }, 60_000);
+
+  it('finishes when the folder it runs in is the filesystem root and no public/ is above the page', () => {
+    const lone = path.join(away, 'from-root');
+    fs.mkdirSync(lone, {recursive: true});
+    const page = path.join(lone, 'page.tsx');
+    fs.writeFileSync(page, 'export default function Page() {\n  return <main><img src="/none.png" alt="" /></main>;\n}\n');
+    const root = path.parse(lone).root;
+    const run = runBin(root, ['experimental', 'render', path.relative(root, page), '--out', path.relative(root, path.join(lone, 'page.html'))]);
+    expect(run.status).toBe(0);
+    expect(run.json.data.warnings.map((/** @type {any} */ w) => w.code)).toContain('missing-asset');
   }, 60_000);
 
   it('keeps a page in a folder named like ..x whole: a file above it stays out, and is named', () => {

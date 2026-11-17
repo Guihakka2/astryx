@@ -157,6 +157,8 @@ function siteRootOf(dir, scope) {
   if (project && holdsPublic(project)) return project;
   for (let d = dir; d === scope || isInside(d, scope); d = path.dirname(d)) {
     if (holdsPublic(d)) return d;
+    // The walk ends at the scope; at the filesystem root, dirname is the root.
+    if (d === scope || path.dirname(d) === d) break;
   }
   return project ?? dir;
 }
@@ -844,6 +846,16 @@ export function assetRef(ref, at) {
 }
 
 /**
+ * The public/ folder a `/` path is read from, as a path from the page's
+ * folder (`public/`, `../../public/`).
+ * @param {{dir: string, root: string}} at
+ */
+function publicFolderOf(at) {
+  const rel = path.relative(at.dir, path.join(at.root, 'public')).split(path.sep).join('/');
+  return `${rel}/`;
+}
+
+/**
  * Inline local images (src, srcset, poster and CSS url()) as data: URIs. A
  * link (`href`) loads nothing, so it is left alone.
  * @param {string} text markup or CSS
@@ -879,7 +891,9 @@ function inlineAssets(text, kind, ctx) {
           code: 'missing-asset',
           message:
             named.kind === 'missing'
-              ? `${clean} was not found next to the page, so it is left as is and will not show.`
+              ? clean.startsWith('/')
+                ? `${clean} was not found in ${publicFolderOf(ctx)}, where a path from the site's root is read, so it is left as is and will not show.`
+                : `${clean} was not found next to the page, so it is left as is and will not show.`
               : named.kind === 'unreadable'
                 ? `${clean} cannot be read (no permission), so it is left as is and will not show.`
                 : `${clean} is not a regular file (a pipe, a device or a folder), so it is not read and will not show.`,
@@ -1378,24 +1392,33 @@ export async function renderPage(entry, options = {}) {
       continue;
     }
     for (const ref of assetRefsOf(text, file)) {
-      /** @type {string | null} */
-      let asset;
+      const how = `named in ${path.relative(dir, file).split(path.sep).join('/')}`;
+      /** @param {string} f */
+      const local = f => isInside(f, named) && isFileAt(f);
+      /** The file the string names in the browser: a path from the site's root, or, for a relative string, from the page's folder (the file's address), not the module's. @type {string | null} */
+      let shown;
       if (ref.startsWith('/')) {
         const found = assetRef(ref, {dir, root: site});
-        asset = found?.kind === 'file' ? found.file : null;
+        shown = found?.kind === 'file' ? found.file : null;
       } else {
-        asset = path.resolve(path.dirname(file), ref);
-        if (!isInside(asset, named) || !isFileAt(asset)) asset = null;
+        // The file the module names beside it, which a restore lays out
+        // where the module's own folder finds it.
+        const beside = path.resolve(path.dirname(file), ref);
+        if (local(beside)) carryAsset(beside, how);
+        // A stylesheet's url() is its own folder's file, which its inlined
+        // rules already carry; only a module's string reaches the script.
+        if (/\.css$/i.test(file)) continue;
+        shown = path.resolve(dir, ref);
+        if (!local(shown)) shown = null;
       }
-      if (!asset) continue;
-      carryAsset(
-        asset,
-        `named in ${path.relative(dir, file).split(path.sep).join('/')}`,
-      );
+      if (!shown) continue;
+      carryAsset(shown, how);
       // An image the page draws only later (the next view, a row below the
-      // fold) shows from the same carried data once the script draws it.
-      if (files.includes(asset) && !ctx.rewrites.has(ref)) {
-        ctx.rewrites.set(ref, assetDataUri(asset));
+      // fold) shows from that file's carried data once the script draws it,
+      // as the first paint shows the images it draws. The same string in two
+      // folders names one file in the browser, so it gets one file's data.
+      if (files.includes(shown) && !ctx.rewrites.has(ref)) {
+        ctx.rewrites.set(ref, assetDataUri(shown));
       }
     }
   }
@@ -1508,12 +1531,22 @@ export async function renderPage(entry, options = {}) {
       const rel = carried.get(path.resolve(named));
       if (rel && aliasOnly(spec)) aliases[spec] = rel;
     }
+    // The public/ folder the render read `/` paths from, when the file
+    // carries files from it, so a reverse expects them there and not in
+    // another public/ the tree holds.
+    const publicRel = path.relative(base, path.join(site, 'public')).split(path.sep).join('/');
+    const publicDir =
+      publicRel && !publicRel.startsWith('..') && !path.isAbsolute(publicRel) &&
+      embedded.some(f => f.path.startsWith(`${publicRel}/`))
+        ? publicRel
+        : null;
     const record = {
       ...(facts.cli ? {cli: facts.cli} : {}),
       page: facts.page,
       ...(options.title === undefined ? {} : {title: options.title}),
       packages,
       ...(Object.keys(aliases).length > 0 ? {aliases} : {}),
+      ...(publicDir ? {publicDir} : {}),
       markup: {
         sha256: sha256(asParsed(body)),
         style: sha256(asParsed(style)),

@@ -405,6 +405,50 @@ export default function Page() {
     expect(fs.readFileSync(path.join(dir, 'drawn-later-back/src/near.png'))).toEqual(png);
   }, 120_000);
 
+  it('shows the file a relative string names from the page, also when modules in two folders each name one', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+      'base64',
+    );
+    // Three different files with the same name: the same image bytes, each with its own trailing byte.
+    const own = (/** @type {number} */ n) => Buffer.concat([png, Buffer.from([n])]);
+    put('two-folders/a/photo.png', own(1));
+    put('two-folders/b/photo.png', own(2));
+    put('two-folders/photo.png', own(3));
+    const card = (/** @type {string} */ name) => `export function ${name}() {\n  return <img src="./photo.png" alt="${name}" />;\n}\n`;
+    put('two-folders/a/CardA.tsx', card('CardA'));
+    put('two-folders/b/CardB.tsx', card('CardB'));
+    put(
+      'two-folders/page.tsx',
+      `import {useState} from 'react';
+import {CardA} from './a/CardA';
+import {CardB} from './b/CardB';
+export default function Page() {
+  const [open, setOpen] = useState(false);
+  return <main><button type="button" onClick={() => setOpen(true)}>Show</button>{open && <><CardA /><CardB /></>}</main>;
+}
+`,
+    );
+    await render('two-folders/page.tsx', {cwd: dir, out: 'two-folders.html'});
+    const dom = new JSDOM(read('two-folders.html'), {runScripts: 'dangerously', pretendToBeVisual: true});
+    const settle = () => new Promise(resolve => dom.window.setTimeout(resolve, 100));
+    await settle();
+    const doc = dom.window.document;
+    /** @type {HTMLButtonElement} */ (doc.querySelector(`#${ROOT_ID} button`)).click();
+    await settle();
+    // In a browser both strings name the page folder's photo.png, so both show it.
+    const page = `data:image/png;base64,${own(3).toString('base64')}`;
+    for (const alt of ['CardA', 'CardB']) {
+      expect(doc.querySelector(`#${ROOT_ID} img[alt="${alt}"]`)?.getAttribute('src')).toBe(page);
+    }
+    dom.window.close();
+    // Each module's own photo.png is still carried, so a restore lays it out beside the module.
+    const back = /** @type {any} */ (await render('two-folders.html', {cwd: dir, reverse: true, out: 'two-folders-back/page.tsx'}));
+    expect(back.data.exact).toBe(true);
+    expect(fs.readFileSync(path.join(dir, 'two-folders-back/a/photo.png'))).toEqual(own(1));
+    expect(fs.readFileSync(path.join(dir, 'two-folders-back/b/photo.png'))).toEqual(own(2));
+  }, 120_000);
+
   it("keeps the first paint when the page's script throws", async () => {
     put(
       'src/throws.tsx',
