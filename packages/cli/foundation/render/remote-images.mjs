@@ -11,7 +11,9 @@
  */
 
 import * as https from 'node:https';
-import {MAX_ASSET_BYTES} from './assets.mjs';
+import {MAX_ASSET_BYTES, imageTypeOf} from './assets.mjs';
+
+export {imageTypeOf};
 
 /** How long one image may take, from the request to its last byte. */
 export const REMOTE_IMAGE_TIMEOUT_MS = 5000;
@@ -66,7 +68,21 @@ export function imageRequest(href, init = {}, transport = https) {
             redirects < MOST_REDIRECTS
           ) {
             response.destroy();
-            const next = new URL(location, url);
+            /** @type {URL} */
+            let next;
+            try {
+              next = new URL(location, url);
+            } catch {
+              resolve({
+                ok: false,
+                status,
+                url,
+                badLocation: true,
+                headers: {get: () => null},
+                body: null,
+              });
+              return;
+            }
             if (next.protocol !== scheme) {
               resolve({
                 ok: false,
@@ -105,33 +121,6 @@ export function imageRequest(href, init = {}, transport = https) {
     };
     go(href, 0);
   });
-}
-
-/**
- * The image type that bytes are, by their leading bytes, or null for any
- * other bytes (a font, a page, a script).
- * @param {Buffer} bytes
- * @returns {string | null}
- */
-export function imageTypeOf(bytes) {
-  const at = (/** @type {number} */ i, /** @type {string} */ text) =>
-    bytes.subarray(i, i + text.length).toString('latin1') === text;
-  if (at(0, '\x89PNG\r\n\x1a\n')) return 'image/png';
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
-    return 'image/jpeg';
-  if (at(0, 'GIF87a') || at(0, 'GIF89a')) return 'image/gif';
-  if (at(0, 'RIFF') && at(8, 'WEBP')) return 'image/webp';
-  if (at(4, 'ftypavif') || at(4, 'ftypavis')) return 'image/avif';
-  if (at(0, 'BM')) return 'image/bmp';
-  if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && bytes[3] === 0)
-    return 'image/x-icon';
-  const head = bytes
-    .subarray(0, 4096)
-    .toString('utf8')
-    .replace(/^\uFEFF/, '')
-    .trimStart();
-  if (head.startsWith('<') && /<svg[\s>]/i.test(head)) return 'image/svg+xml';
-  return null;
 }
 
 /**
@@ -268,6 +257,9 @@ export function remoteImages({
     gotAnswer.add(request);
     if (response.ok) answered++;
     const stop = () => response.body?.cancel().catch(() => {});
+    if (response.badLocation) {
+      return {reason: 'it moved to an address that is not valid'};
+    }
     if (response.url && !response.url.startsWith('https:')) {
       stop();
       return {reason: 'it moved to an address that is not https'};

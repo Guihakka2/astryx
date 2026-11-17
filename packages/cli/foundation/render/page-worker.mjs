@@ -663,8 +663,39 @@ function aliasPlugin() {
 /** An image file's extension at the end of an address's path. */
 const IMAGE_PATH = /\.(png|jpe?g|gif|webp|avif|svg|ico)$/i;
 
-/** A property or attribute name that names an image (`avatarUrl`, `coverImage`, `src`). */
-const IMAGE_NAME = /avatar|image|img|photo|picture|thumbnail|thumb|logo|icon|cover|banner|poster|background/i;
+/** The words a property or attribute name uses for an image. */
+const IMAGE_WORDS = new Set([
+  'avatar',
+  'image',
+  'img',
+  'photo',
+  'picture',
+  'thumbnail',
+  'thumb',
+  'logo',
+  'icon',
+  'cover',
+  'banner',
+  'poster',
+  'background',
+]);
+
+/**
+ * Whether a property or attribute name names an image: one of its words
+ * (`avatarUrl`, `cover_image`, `hero-photos`) is an image word, singular or
+ * plural. A word that only holds one (`logoutUrl`, `discoverUrl`) does not.
+ * @param {string} name
+ */
+function namesImage(name) {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .some(word => {
+      const lower = word.toLowerCase();
+      return IMAGE_WORDS.has(lower) || (lower.endsWith('s') && IMAGE_WORDS.has(lower.slice(0, -1)));
+    });
+}
 
 /** The attributes where JSX puts an image's address. */
 const SRC_ATTR = /^(src|srcset|poster)$/i;
@@ -721,7 +752,7 @@ function isImageLiteral(value, p) {
     return false;
   }
   const named = nameOfValue(p);
-  return Boolean(named && (SRC_ATTR.test(named.name) || IMAGE_NAME.test(named.name)));
+  return Boolean(named && (SRC_ATTR.test(named.name) || namesImage(named.name)));
 }
 
 /**
@@ -768,7 +799,7 @@ function pagePlugin(filename, browser = false) {
   const builtAddress = (p, https) => {
     if (!https) return;
     const named = nameOfValue(p);
-    if (!named || !(SRC_ATTR.test(named.name) || IMAGE_NAME.test(named.name))) return;
+    if (!named || !(SRC_ATTR.test(named.name) || namesImage(named.name))) return;
     const {start, end} = p.node;
     const text = typeof start === 'number' && typeof end === 'number' ? p.hub?.file?.code?.slice(start, end) : null;
     builtRemote.push({text: text ?? '(an address built in code)', file: filename, line: p.node.loc?.start.line ?? 0});

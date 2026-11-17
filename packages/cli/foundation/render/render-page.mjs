@@ -738,6 +738,13 @@ export function withCarriedPaths(script, rewrites) {
         )
         .join('');
     }
+    // A CSS url() in a style the script sets (`backgroundImage:
+    // "url(./bg.png)"`) names the same file. A data: URI with no space,
+    // quote or parenthesis needs no quotes in url().
+    if (/[\s()]/.test(now)) continue;
+    for (const form of [`url(${was})`, `url("${was}")`, `url('${was}')`]) {
+      out = out.split(form).join(`url(${now})`);
+    }
   }
   return out;
 }
@@ -926,12 +933,15 @@ function inlineAssets(text, kind, ctx) {
  *   as the page wrote it, with what it became
  */
 function mapAssetRefs(text, kind, resolve, rewrites) {
-  /** @param {string} value */
-  const urls = value =>
+  /**
+   * @param {string} value
+   * @param {boolean} [record] keep each rewrite, for a style the script sets
+   */
+  const urls = (value, record = false) =>
     value.replace(new RegExp(CSS_URL.source, 'g'), (whole, ...rest) => {
-      const uri = resolve(
-        cssUrlRef(/** @type {any} */ ({groups: rest.at(-1)})),
-      );
+      const ref = cssUrlRef(/** @type {any} */ ({groups: rest.at(-1)}));
+      const uri = resolve(ref);
+      if (uri && record && ref) rewrites?.set(ref, uri);
       return uri ? `url("${uri}")` : whole;
     });
   if (kind === 'css') return urls(text);
@@ -958,7 +968,7 @@ function mapAssetRefs(text, kind, resolve, rewrites) {
     .replace(/\sstyle="([^"]*)"/g, (whole, style) => {
       // The attribute holds escaped text: rewrite the CSS it means, then
       // escape it again, so a data: URI's quotes cannot end the attribute.
-      const css = urls(decodeAttr(style));
+      const css = urls(decodeAttr(style), true);
       return ` style="${css.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`;
     });
 }
@@ -1230,7 +1240,18 @@ export async function renderPage(entry, options = {}) {
     await remote.get(literals);
     for (const url of literals) {
       const fetched = remote.results.get(url);
-      if (fetched && 'uri' in fetched && !ctx.rewrites.has(url)) ctx.rewrites.set(url, fetched.uri);
+      if (!fetched) continue;
+      if ('uri' in fetched) {
+        if (!ctx.rewrites.has(url)) ctx.rewrites.set(url, fetched.uri);
+        continue;
+      }
+      const key = `remote:${url}`;
+      if (ctx.counted.has(key)) continue;
+      ctx.counted.add(key);
+      warnings.push({
+        code: 'remote-asset',
+        message: `${url}, which the page's code names as an image, is loaded from the network when the script draws it, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: ${fetched.reason}.`,
+      });
     }
   }
   /** Built addresses named in a warning already. @type {Set<string>} */

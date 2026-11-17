@@ -277,6 +277,11 @@ describe('imageRequest', () => {
         res.end();
         return;
       }
+      if (req.url === '/broken') {
+        res.writeHead(302, {location: 'http://[bad'});
+        res.end();
+        return;
+      }
       if (req.url === '/away') {
         res.writeHead(302, {location: 'https://example.com/a.png'});
         res.end();
@@ -317,6 +322,16 @@ describe('imageRequest', () => {
       ),
     ).toBe(true);
     expect(seen.at(-1)?.connection).toBe('close');
+  });
+
+  it('answers a redirect to an address that is not valid as such, and never throws', async () => {
+    const answer = await imageRequest(
+      `${base}/broken`,
+      {},
+      /** @type {any} */ (http),
+    );
+    expect(answer.ok).toBe(false);
+    expect(answer.badLocation).toBe(true);
   });
 
   it('does not follow a redirect to another scheme', async () => {
@@ -400,6 +415,104 @@ describe('a render with images from the web', () => {
         'base64',
       ).toString('utf8');
       expect(carried).toContain('src="https://example.com/shoe.png"');
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('fetches an address by the image word in its name, never by a word that only holds one', async () => {
+    const dir = makeLinkedFixture('astryx-render-names-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          'const links = {',
+          "  logoutUrl: 'https://example.com/logout',",
+          "  apiConfigUrl: 'https://example.com/api/config',",
+          "  discoverUrl: 'https://example.com/discover',",
+          "  recoveryUrl: 'https://example.com/recovery',",
+          '};',
+          "const team = {iconUrl: 'https://example.com/team-icon'};",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return (',
+          '    <main>',
+          '      <a href={links.logoutUrl}>Out</a>',
+          '      <button onClick={() => setOpen(true)}>Team</button>',
+          '      {open && <img src={team.iconUrl} alt="Team" />}',
+          '    </main>',
+          '  );',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({
+        'https://example.com/team-icon': png(),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked.map(a => a.url)).toEqual(['https://example.com/team-icon']);
+      expect(page.remoteImages?.fetched).toEqual([
+        'https://example.com/team-icon',
+      ]);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('keeps a fetched background image once the script draws the page', async () => {
+    const dir = makeLinkedFixture('astryx-render-style-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        'export default function Page() { return <div style={{backgroundImage: "url(https://example.com/bg.png)"}}>Hero</div>; }\n',
+      );
+      const {fetch} = fetchFrom({'https://example.com/bg.png': png()});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      const data = `data:image/png;base64,${PNG.toString('base64')}`;
+      expect(renderedMarkupOf(page.html)).toContain(data);
+      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      expect(script).not.toContain('https://example.com/bg.png');
+      expect(script).toContain(`url(${data})`);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('warns for an image the script draws later when its fetch fails', async () => {
+    const dir = makeLinkedFixture('astryx-render-late-fail-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const user = {avatarUrl: 'https://example.com/me'};",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>Me</button>{open && <img src={user.avatarUrl} alt="Me" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(page.warnings).toContainEqual({
+        code: 'remote-asset',
+        message:
+          "https://example.com/me, which the page's code names as an image, is loaded from the network when the script draws it, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: the network could not reach it.",
+      });
     } finally {
       removeLinkedFixture(dir);
     }
