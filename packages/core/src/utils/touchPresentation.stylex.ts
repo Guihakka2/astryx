@@ -7,7 +7,7 @@
  *   StyleX at-rule keys
  * @position The reference spellings of the touch, compact and iOS-gate
  *   conditions. utils/touchPresentation.ts holds the same conditions for
- *   script; theme/sizeQueries.ts spells the compact key.
+ *   script; theme/themeAdaptations.ts spells the compact key.
  *
  * SYNC: When modified, update touchPresentation.ts and
  * touchPresentation.test.ts.
@@ -25,9 +25,8 @@ export const touchKeys = stylex.defineConsts({
   /** The primary pointer is coarse (TOUCH_QUERY). */
   touch: '@media (pointer: coarse)',
   /**
-   * The viewport is compact (COMPACT_STYLE_KEY): COMPACT_QUERY as a StyleX
-   * key. For compact and touch, nest this key inside `touch`
-   * (COMPACT_TOUCH_STYLE_KEYS).
+   * The viewport is compact: COMPACT_QUERY as a StyleX key (belowStyleKey).
+   * For compact and touch, nest this key inside `touch`.
    */
   compact: '@media not all and (min-width: 768px) and (min-height: 500px)',
   /**

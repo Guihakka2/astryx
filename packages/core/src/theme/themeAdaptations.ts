@@ -3,7 +3,8 @@
 /**
  * @file themeAdaptations.ts
  * @input Ordered environment-conditioned theme value rules from defineTheme
- * @output Validated breakpoint metadata, the compact definition, and resolved
+ * @output Validated breakpoint metadata, the compact definition, the size-edge
+ *   spellings (range features and the StyleX "below" key), and resolved
  *   CSS-first rule layers
  * @position Theme system core; consumed by defineTheme, AppShell, and the CSS compiler
  *
@@ -33,11 +34,6 @@ import type {ColorScaleConfig} from './expandColorScale';
 import {resolveThemeValues, type ThemeValuesInput} from './resolveThemeValues';
 import {withoutUnsetComponents} from './mergeComponents';
 import {assertNoTokenCycles, resolveAdaptationLocalTokens} from './localTokens';
-import {
-  heightBelowFeature,
-  widthBelowFeature,
-  widthFromFeature,
-} from './sizeQueries';
 
 // =============================================================================
 // Public authoring vocabulary
@@ -61,6 +57,48 @@ export const DEFAULT_WIDTH_BREAKPOINTS: Readonly<WidthBreakpoints> =
     xl: 1280,
     '2xl': 1536,
   });
+
+// StyleX lowers a range feature such as `(width < 768px)` to
+// `(max-width: 767.99px)`. Chromium rounds that length up to 768px, so the
+// rule also matches at exactly 768px wide, where the wider side must apply.
+// A StyleX key therefore says "below" as the negation of the
+// inclusive lower edge, which StyleX keeps as written and every browser
+// answers exactly. Script and plain CSS keep the range features, which the
+// browser reads directly.
+
+/** A width strictly below `px`, as a media feature for script or plain CSS. */
+export function widthBelowFeature(px: number): string {
+  return `(width < ${px}px)`;
+}
+
+/** A height strictly below `px`, as a media feature for script or plain CSS. */
+export function heightBelowFeature(px: number): string {
+  return `(height < ${px}px)`;
+}
+
+/** A width at or above `px`, as a media feature for script or plain CSS. */
+export function widthFromFeature(px: number): string {
+  return `(width >= ${px}px)`;
+}
+
+/** The edges of a "below" condition: true below the width, or below the height. */
+export interface BelowEdges {
+  /** Matches below this width. */
+  readonly width: number;
+  /** Also matches below this height. */
+  readonly height?: number;
+}
+
+/**
+ * The StyleX media key for "narrower than `width`, or shorter than `height`".
+ * Write the returned string as a literal key: a computed key gets a different
+ * StyleX priority.
+ */
+export function belowStyleKey({width, height}: BelowEdges): string {
+  const heightEdge =
+    height === undefined ? '' : ` and (min-height: ${height}px)`;
+  return `@media not all and (min-width: ${width}px)${heightEdge}`;
+}
 
 /**
  * When a screen is compact, for a component that chooses a presentation by

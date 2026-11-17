@@ -3,14 +3,15 @@
 /**
  * @file stylex-size-boundary.browser.test.mjs
  * @input Core's compact StyleX key (touchKeys.compact, alone and nested in
- *   the touch key, as COMPACT_TOUCH_STYLE_KEYS nests it) compiled by core's
+ *   the touch key, as the touch presentation notes nest it) compiled by core's
  *   build; run with
  *   ASTRYX_STYLEX_BROWSER=1 after installing Chromium (CI's test-build job
  *   does both)
  * @output Real-browser proof that the compact keys match at 767px wide and
  *   499px tall and not at 768px or 500px, under a fine and a coarse pointer,
  *   and that the range spelling StyleX lowers does match at the edge
- * @position The browser half of packages/core/src/theme/sizeQueries.test.ts
+ * @position The browser half of
+ *   packages/core/src/theme/themeAdaptations.edges.test.ts
  */
 
 import fs from 'node:fs';
@@ -21,10 +22,6 @@ import stylexBabelPlugin from '@stylexjs/babel-plugin';
 import {chromium} from 'playwright';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 
-import {
-  heightBelowFeature,
-  widthBelowFeature,
-} from '../packages/core/src/theme/sizeQueries';
 import {TOUCH_QUERY} from '../packages/core/src/utils/touchQueries';
 
 const CORE = path.resolve(import.meta.dirname, '../packages/core');
@@ -41,7 +38,8 @@ const COMPACT_STYLE_KEY = /^\s*compact:\s*'([^']+)'/m.exec(
   ),
 )[1];
 const TOUCH_KEY = `@media ${TOUCH_QUERY}`;
-const COMPACT_QUERY = `${widthBelowFeature(768)}, ${heightBelowFeature(500)}`;
+// The range spelling the compact definition gives script.
+const COMPACT_QUERY = '(width < 768px), (height < 500px)';
 
 // Literal keys, as Core writes them. `range` is the spelling StyleX lowers
 // to a length that also matches at the edge: the control.

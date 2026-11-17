@@ -87,8 +87,8 @@ import {useThemeDefinition} from '../theme/useTheme';
 import {
   DEFAULT_WIDTH_BREAKPOINTS,
   type WidthBreakpointName,
+  widthBelowFeature,
 } from '../theme/themeAdaptations';
-import {widthBelowFeature} from '../theme/sizeQueries';
 import type {AppShellVariantMap} from './index';
 
 import {useMergedRefs} from '../hooks/useMergedRefs';

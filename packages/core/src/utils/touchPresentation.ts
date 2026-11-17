@@ -5,8 +5,7 @@
 /**
  * @file touchPresentation.ts
  * @input useMediaQuery, window.matchMedia, and TOUCH_QUERY from touchQueries.ts
- * @output TOUCH_QUERY, COMPACT_QUERY, COMPACT_TOUCH_QUERY, their StyleX keys
- *   (COMPACT_STYLE_KEY, COMPACT_TOUCH_STYLE_KEYS), the iOS style gate
+ * @output TOUCH_QUERY, COMPACT_QUERY, COMPACT_TOUCH_QUERY, the iOS style gate
  *   (IOS_SUPPORTS_QUERY and its StyleX keys), useTouchPresentation, and
  *   readTouchPresentation
  * @position Internal shared resolver beside interactionModality.ts; the one
@@ -26,8 +25,10 @@
 //
 // A style that changes with these conditions uses the same condition as a
 // StyleX media key, so the right rule paints before hydration: TOUCH_QUERY
-// as written, compact as COMPACT_STYLE_KEY, and compact touch as the two
-// nested COMPACT_TOUCH_STYLE_KEYS. The iOS gate is two nested keys, the
+// as written, compact as `touchKeys.compact` (belowStyleKey of the default
+// edges, because StyleX rewrites a range query to a length that matches at
+// the edge), and compact touch as the touch key with the compact key nested
+// inside it. The iOS gate is two nested keys, the
 // media query outside and the supports query inside:
 //
 //   '@media (pointer: coarse)': {
@@ -48,7 +49,6 @@ import {
   compactDefinition,
   type CompactDefinition,
 } from '../theme/themeAdaptations';
-import {belowStyleKey} from '../theme/sizeQueries';
 import {useThemeDefinition} from '../theme/useTheme';
 import {IOS_SUPPORTS_QUERY, TOUCH_QUERY} from './touchQueries';
 
@@ -71,26 +71,6 @@ export const COMPACT_TOUCH_QUERY =
 // The engine is WebKit on iOS or iPadOS, for a style iOS WebKit requires.
 // Defined in touchQueries.ts, which loads without React or the theme.
 export {IOS_SUPPORTS_QUERY};
-
-/**
- * COMPACT_QUERY as a StyleX media key. StyleX rewrites a range feature to a
- * length that matches at the edge itself, so the key negates the edges
- * (belowStyleKey).
- */
-export const COMPACT_STYLE_KEY = belowStyleKey({
-  width: DEFAULT_COMPACT_DEFINITION.widthBelow,
-  height: DEFAULT_COMPACT_DEFINITION.heightBelow,
-});
-
-/**
- * COMPACT_TOUCH_QUERY as StyleX keys, nested in this order: the touch query
- * outside, the compact key inside. One negated query cannot also require
- * the pointer.
- */
-export const COMPACT_TOUCH_STYLE_KEYS = [
-  `@media ${TOUCH_QUERY}`,
-  COMPACT_STYLE_KEY,
-] as const;
 
 /**
  * The iOS gate as StyleX keys, nested in this order: the media query

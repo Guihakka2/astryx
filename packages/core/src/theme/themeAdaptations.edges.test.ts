@@ -1,10 +1,11 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 /**
- * @file sizeQueries.test.ts
- * @input sizeQueries.ts and the source of Core and the published themes
- * @output Checks the size-edge spellings, and that every width or height edge
- *   in Core and the themes goes through sizeQueries.ts
+ * @file themeAdaptations.edges.test.ts
+ * @input The size-edge helpers in themeAdaptations.ts and the source of Core
+ *   and the published themes
+ * @output Checks the size-edge spellings, and that every range or lowered
+ *   width or height edge in Core and the themes goes through those helpers
  * @position Unit half of the boundary proof; the browser half is
  *   scripts/stylex-size-boundary.browser.test.mjs
  */
@@ -17,7 +18,7 @@ import {
   heightBelowFeature,
   widthBelowFeature,
   widthFromFeature,
-} from './sizeQueries';
+} from './themeAdaptations';
 
 const CORE_SRC = path.resolve(__dirname, '..');
 const THEMES = path.resolve(CORE_SRC, '../../themes');
@@ -30,6 +31,13 @@ const HAND_WRITTEN_EDGE = [
   /(?:[\d.]+(?:px|r?em)|\})\s*[<>]=?\s*(?:width|height)\s*\)/,
   /\(\s*(?:max|min)-(?:width|height)\s*:\s*[\d.]*\.\d+px/,
 ];
+
+// The helpers' own spellings, the only lines allowed to write an edge.
+const HELPER_LINES = new Set([
+  'return `(width < ${px}px)`;',
+  'return `(height < ${px}px)`;',
+  'return `(width >= ${px}px)`;',
+]);
 
 function handWrittenEdges(source: string): string[] {
   return source
@@ -57,7 +65,7 @@ function sourceFiles(dir: string): string[] {
   return files;
 }
 
-describe('sizeQueries', () => {
+describe('size edges', () => {
   it('spells range features for script and plain CSS', () => {
     expect(widthBelowFeature(768)).toBe('(width < 768px)');
     expect(heightBelowFeature(500)).toBe('(height < 500px)');
@@ -90,7 +98,7 @@ describe('sizeQueries', () => {
     expect(handWrittenEdges(`  // (width < 768px) in a comment`)).toEqual([]);
   });
 
-  it('keeps every width and height edge in Core and the themes in sizeQueries.ts', () => {
+  it('keeps every range or lowered width and height edge in Core and the themes in the helpers', () => {
     const roots = [
       CORE_SRC,
       ...fs
@@ -99,14 +107,14 @@ describe('sizeQueries', () => {
         .map(entry => path.join(THEMES, entry.name, 'src'))
         .filter(dir => fs.existsSync(dir)),
     ];
-    const helper = path.join(CORE_SRC, 'theme/sizeQueries.ts');
+    const helper = path.join(CORE_SRC, 'theme/themeAdaptations.ts');
     const found: string[] = [];
     for (const root of roots) {
       for (const file of sourceFiles(root)) {
-        if (file === helper) {
-          continue;
-        }
         for (const line of handWrittenEdges(fs.readFileSync(file, 'utf8'))) {
+          if (file === helper && HELPER_LINES.has(line.trim())) {
+            continue;
+          }
           found.push(`${path.relative(CORE_SRC, file)}: ${line.trim()}`);
         }
       }

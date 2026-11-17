@@ -658,8 +658,8 @@ in `../utils/touchPresentation.ts`:
   both (`COMPACT_TOUCH_QUERY`).
 
 Styles switch on the same conditions with StyleX media keys, so the first
-paint is right: `'@media (pointer: coarse)'` for touch, `COMPACT_STYLE_KEY`
-for compact, and the two nested `COMPACT_TOUCH_STYLE_KEYS` for both, each
+paint is right: `'@media (pointer: coarse)'` for touch, `touchKeys.compact`
+for compact, and the compact key nested inside the touch key for both, each
 spelled exactly as the constant, which a test enforces. The compact key
 negates the size edges, because StyleX rewrites a range query to a length
 that also matches at the edge. Behaviour reads

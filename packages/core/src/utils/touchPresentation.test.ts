@@ -23,13 +23,14 @@ import {
   useAdaptivePresentation,
 } from '../hooks/useAdaptivePresentation';
 import {reducedMotionKeys} from '../motion/reducedMotion.stylex';
-import {DEFAULT_COMPACT_DEFINITION} from '../theme/themeAdaptations';
+import {
+  DEFAULT_COMPACT_DEFINITION,
+  belowStyleKey,
+} from '../theme/themeAdaptations';
 import {Theme, defineTheme} from '../theme';
 import {
   COMPACT_QUERY,
-  COMPACT_STYLE_KEY,
   COMPACT_TOUCH_QUERY,
-  COMPACT_TOUCH_STYLE_KEYS,
   IOS_SUPPORTS_QUERY,
   IOS_TOUCH_STYLE_KEYS,
   TOUCH_QUERY,
@@ -213,18 +214,19 @@ describe('touch presentation', () => {
 
   it('holds the same keys the resolver defines', () => {
     expect(touchKeys.touch).toBe(`@media ${TOUCH_QUERY}`);
-    expect(touchKeys.compact).toBe(COMPACT_STYLE_KEY);
-    expect(COMPACT_QUERY).toBe('(width < 768px), (height < 500px)');
-    expect(COMPACT_STYLE_KEY).toBe(
+    expect(touchKeys.compact).toBe(
+      belowStyleKey({
+        width: DEFAULT_COMPACT_DEFINITION.widthBelow,
+        height: DEFAULT_COMPACT_DEFINITION.heightBelow,
+      }),
+    );
+    expect(touchKeys.compact).toBe(
       '@media not all and (min-width: 768px) and (min-height: 500px)',
     );
+    expect(COMPACT_QUERY).toBe('(width < 768px), (height < 500px)');
     expect(COMPACT_TOUCH_QUERY).toBe(
       '(width < 768px) and (pointer: coarse), (height < 500px) and (pointer: coarse)',
     );
-    expect(COMPACT_TOUCH_STYLE_KEYS).toEqual([
-      touchKeys.touch,
-      touchKeys.compact,
-    ]);
     expect(touchKeys.iosSupports).toBe(`@supports ${IOS_SUPPORTS_QUERY}`);
     expect(IOS_TOUCH_STYLE_KEYS).toEqual([
       touchKeys.touch,
