@@ -26,12 +26,16 @@ let tmp;
 let astryxApp;
 /** @type {string} */
 let plainApp;
+/** @type {string} */
+let outside;
 
 beforeAll(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-share-guides-'));
   astryxApp = makeLinkedFixture('astryx-share-guides-app-', [
     '@astryxdesign/core',
   ]);
+  outside = path.join(tmp, 'outside');
+  fs.mkdirSync(outside, {recursive: true});
   plainApp = path.join(tmp, 'plain');
   fs.mkdirSync(plainApp, {recursive: true});
   fs.writeFileSync(
@@ -80,16 +84,25 @@ describe('search and the shareable-page guides', () => {
   );
 
   it.each(['share', 'single file', 'static html'])(
+    'outside any package, "%s" returns a shareable-page guide first',
+    async query => {
+      const [first] = await docs(query, outside);
+      expect(isGuide(first)).toBe(true);
+    },
+  );
+
+  it.each(['share', 'single file', 'static html'])(
     'in a project without Astryx, "%s" returns no shareable-page guide',
     async query => {
       expect((await docs(query, plainApp)).filter(isGuide)).toEqual([]);
     },
   );
 
-  it.each(['plain', 'astryx'])(
+  it.each(['plain', 'astryx', 'outside'])(
     'in a %s folder, an exported index ranks "single file" as search() does',
     async kind => {
-      const cwd = kind === 'plain' ? plainApp : astryxApp;
+      const cwd =
+        kind === 'plain' ? plainApp : kind === 'outside' ? outside : astryxApp;
       const index = JSON.parse(JSON.stringify(await exportSearchIndex({cwd})));
       const expected = JSON.parse(
         JSON.stringify(await search('single file', {cwd, limit: 50})),

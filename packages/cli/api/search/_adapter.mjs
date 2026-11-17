@@ -19,7 +19,10 @@ import {
   reusedWhileUnchanged,
   unchangedSince,
 } from '../../foundation/fs/read-record.mjs';
-import {isOutsideProject} from '../../foundation/env/project-scope.mjs';
+import {
+  isOutsideAnyPackage,
+  isOutsideProject,
+} from '../../foundation/env/project-scope.mjs';
 import {coreDirOrThrow} from '../error.mjs';
 import {loadBlockPicker} from '../build/_adapter.mjs';
 import {CORELESS_DOMAINS} from './_query.mjs';
@@ -179,15 +182,18 @@ export function withoutShareGuides(gathered) {
 
 /**
  * The gathered catalog as a folder sees it: the shareable-page guides answer
- * only in a project that depends on Astryx Core (spec:AST-017 FR27), so a
- * folder without Core gathers as if they were absent.
+ * in a project that depends on Astryx Core and outside any package, where
+ * the page is the Astryx page being made (spec:AST-017 FR27). In a project
+ * without Core, search gathers as if they were absent.
  * @template {{all: Candidate[]}} T
  * @param {T} gathered
  * @param {string} cwd
  * @returns {T}
  */
 function shareGuidesFor(gathered, cwd) {
-  return installedProjectCoreDir(cwd) ? gathered : withoutShareGuides(gathered);
+  return installedProjectCoreDir(cwd) || isOutsideAnyPackage(cwd)
+    ? gathered
+    : withoutShareGuides(gathered);
 }
 
 /**
