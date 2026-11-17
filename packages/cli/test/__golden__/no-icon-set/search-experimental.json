@@ -3,8 +3,28 @@
   "type": "search",
   "data": {
     "query": "experimental",
-    "matchCount": 13,
+    "matchCount": 22,
     "results": [
+      {
+        "domain": "doc",
+        "name": "cli/experimental/render-pages",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/render-pages experimental",
+        "parent": "astryx docs cli/experimental/render-pages --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Pages as one HTML file › Experimental",
+          "This command is experimental, as everything under `astryx docs cli/experimental` is: its options, its output file and its JSON may still change.",
+          "astryx docs cli/experimental/render-pages --index",
+          "astryx docs cli/experimental/render-pages experimental",
+          "cli/experimental/render-pages",
+          "experimental"
+        ]
+      },
       {
         "domain": "doc",
         "name": "author-a-theme",
@@ -96,6 +116,158 @@
       },
       {
         "domain": "doc",
+        "name": "cli/experimental/render-pages",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/render-pages --index",
+        "parent": "astryx docs cli/experimental",
+        "mentions": [
+          "Astryx CLI › Experimental features › Pages as one HTML file",
+          "Experimental.",
+          "astryx docs cli/experimental",
+          "astryx docs cli/experimental/render-pages --index",
+          "cli/experimental/render-pages",
+          "description mentions \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/render-pages",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/render-pages make-a-file",
+        "parent": "astryx docs cli/experimental/render-pages --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Pages as one HTML file › Make a file to share",
+          "astryx docs cli/experimental/render-pages --index",
+          "astryx docs cli/experimental/render-pages make-a-file",
+          "cli/experimental/render-pages",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/render-pages",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/render-pages get-it-back",
+        "parent": "astryx docs cli/experimental/render-pages --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Pages as one HTML file › Get the page back",
+          "astryx docs cli/experimental/render-pages --index",
+          "astryx docs cli/experimental/render-pages get-it-back",
+          "cli/experimental/render-pages",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/share-a-page",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/share-a-page --index",
+        "parent": "astryx docs cli/experimental",
+        "mentions": [
+          "Astryx CLI › Experimental features › Make a shareable page",
+          "Experimental.",
+          "astryx docs cli/experimental",
+          "astryx docs cli/experimental/share-a-page --index",
+          "cli/experimental/share-a-page",
+          "description mentions \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/share-a-page",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/share-a-page overview",
+        "parent": "astryx docs cli/experimental/share-a-page --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Make a shareable page › Four steps",
+          "astryx docs cli/experimental/share-a-page --index",
+          "astryx docs cli/experimental/share-a-page overview",
+          "cli/experimental/share-a-page",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/share-a-page",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/share-a-page render",
+        "parent": "astryx docs cli/experimental/share-a-page --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Make a shareable page › 2.",
+          "astryx docs cli/experimental/share-a-page --index",
+          "astryx docs cli/experimental/share-a-page render",
+          "cli/experimental/share-a-page",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/share-a-page",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/share-a-page change",
+        "parent": "astryx docs cli/experimental/share-a-page --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Make a shareable page › 4.",
+          "astryx docs cli/experimental/share-a-page --index",
+          "astryx docs cli/experimental/share-a-page change",
+          "cli/experimental/share-a-page",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
+        "name": "cli/experimental/share-a-page",
+        "package": "@astryxdesign/cli",
+        "score": "<text>",
+        "reason": "<text>",
+        "description": "<text>",
+        "section": "<text>",
+        "title": "<text>",
+        "command": "astryx docs cli/experimental/share-a-page problems",
+        "parent": "astryx docs cli/experimental/share-a-page --index",
+        "mentions": [
+          "Astryx CLI › Experimental features › Make a shareable page › When a step fails",
+          "astryx docs cli/experimental/share-a-page --index",
+          "astryx docs cli/experimental/share-a-page problems",
+          "cli/experimental/share-a-page",
+          "docs mention \"experimental\""
+        ]
+      },
+      {
+        "domain": "doc",
         "name": "styling/tokens-and-setup",
         "package": "@astryxdesign/cli",
         "score": "<text>",
@@ -149,51 +321,6 @@
         "section": "<text>",
         "title": "<text>",
         "command": "astryx docs theme look-after-each-change",
-        "parent": "astryx docs theme --index",
-        "mentions": [
-          "description mentions \"experimental\""
-        ]
-      },
-      {
-        "domain": "doc",
-        "name": "theme",
-        "package": "@astryxdesign/cli",
-        "score": "<text>",
-        "reason": "<text>",
-        "description": "<text>",
-        "section": "<text>",
-        "title": "<text>",
-        "command": "astryx docs theme denser-or-roomier",
-        "parent": "astryx docs theme --index",
-        "mentions": [
-          "description mentions \"experimental\""
-        ]
-      },
-      {
-        "domain": "doc",
-        "name": "theme",
-        "package": "@astryxdesign/cli",
-        "score": "<text>",
-        "reason": "<text>",
-        "description": "<text>",
-        "section": "<text>",
-        "title": "<text>",
-        "command": "astryx docs theme one-kind-of-part",
-        "parent": "astryx docs theme --index",
-        "mentions": [
-          "description mentions \"experimental\""
-        ]
-      },
-      {
-        "domain": "doc",
-        "name": "theme",
-        "package": "@astryxdesign/cli",
-        "score": "<text>",
-        "reason": "<text>",
-        "description": "<text>",
-        "section": "<text>",
-        "title": "<text>",
-        "command": "astryx docs theme no-app-yet",
         "parent": "astryx docs theme --index",
         "mentions": [
           "description mentions \"experimental\""

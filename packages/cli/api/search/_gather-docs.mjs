@@ -209,10 +209,21 @@ function isExperimentalDoc(doc) {
  * @param {any} node
  */
 function isExperimentalNode(tree, node) {
+  if (SEARCHABLE_EXPERIMENTAL_GUIDES.has(node.route)) return false;
   return [...tree.ancestors(node), node].some((/** @type {any} */ each) =>
     isExperimentalDoc(each.ref?.selfDoc),
   );
 }
+
+/**
+ * The experimental guides search returns (spec:AST-017 FR27, the shareable
+ * page exception): how to turn a page into one HTML file to share. Their own
+ * text says they are experimental.
+ */
+export const SEARCHABLE_EXPERIMENTAL_GUIDES = new Set([
+  'cli/experimental/share-a-page',
+  'cli/experimental/render-pages',
+]);
 
 /**
  * The candidates one topic yields: the topic itself, and one per section when

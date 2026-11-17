@@ -1,4 +1,10 @@
-Results for "experimental" (13)
+Results for "experimental" (20 of 22)
+name:        cli/experimental/render-pages
+section:     experimental
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/render-pages experimental
+parent:      pnpm exec astryx docs cli/experimental/render-pages --index
 name:        author-a-theme
 domain:      doc
 package:     @astryxdesign/cli
@@ -33,6 +39,52 @@ domain:      doc
 package:     @astryxdesign/cli
 command:     pnpm exec astryx docs cli/commands/theme
 parent:      pnpm exec astryx docs cli/commands
+name:        cli/experimental/render-pages
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/render-pages --index
+parent:      pnpm exec astryx docs cli/experimental
+name:        cli/experimental/render-pages
+section:     make-a-file
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/render-pages make-a-file
+parent:      pnpm exec astryx docs cli/experimental/render-pages --index
+name:        cli/experimental/render-pages
+section:     get-it-back
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/render-pages get-it-back
+parent:      pnpm exec astryx docs cli/experimental/render-pages --index
+name:        cli/experimental/share-a-page
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/share-a-page --index
+parent:      pnpm exec astryx docs cli/experimental
+name:        cli/experimental/share-a-page
+section:     overview
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/share-a-page overview
+parent:      pnpm exec astryx docs cli/experimental/share-a-page --index
+name:        cli/experimental/share-a-page
+section:     render
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/share-a-page render
+parent:      pnpm exec astryx docs cli/experimental/share-a-page --index
+name:        cli/experimental/share-a-page
+section:     change
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/share-a-page change
+parent:      pnpm exec astryx docs cli/experimental/share-a-page --index
+name:        cli/experimental/share-a-page
+section:     problems
+domain:      doc
+package:     @astryxdesign/cli
+command:     pnpm exec astryx docs cli/experimental/share-a-page problems
+parent:      pnpm exec astryx docs cli/experimental/share-a-page --index
 name:        styling/tokens-and-setup
 section:     nextjs-webpack
 domain:      doc
@@ -55,22 +107,4 @@ section:     look-after-each-change
 domain:      doc
 package:     @astryxdesign/cli
 command:     pnpm exec astryx docs theme look-after-each-change
-parent:      pnpm exec astryx docs theme --index
-name:        theme
-section:     denser-or-roomier
-domain:      doc
-package:     @astryxdesign/cli
-command:     pnpm exec astryx docs theme denser-or-roomier
-parent:      pnpm exec astryx docs theme --index
-name:        theme
-section:     one-kind-of-part
-domain:      doc
-package:     @astryxdesign/cli
-command:     pnpm exec astryx docs theme one-kind-of-part
-parent:      pnpm exec astryx docs theme --index
-name:        theme
-section:     no-app-yet
-domain:      doc
-package:     @astryxdesign/cli
-command:     pnpm exec astryx docs theme no-app-yet
 parent:      pnpm exec astryx docs theme --index

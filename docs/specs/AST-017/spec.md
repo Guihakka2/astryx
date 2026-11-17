@@ -487,7 +487,12 @@ one removal merged ahead of the decision to allow it.
   app that shows a theme when there is no app yet, phrased for theme work only
   and labeled experimental each time; no other experimental surface may be
   named, and the
-  exception ends when the theme editor graduates or is removed.
+  exception ends when the theme editor graduates or is removed. A second
+  named exception covers sharing a page as one HTML file: `astryx search`
+  MAY return the experimental guides that teach it, whose own text says
+  they are experimental, and the answer to an unknown top-level word that
+  asks for that command MAY name it, labeled experimental; this exception
+  ends when that command graduates or is removed.
 - **FR28 — A planned minor needs no prior deprecation; a patch does.** A change
   landing in a declared minor needs no deprecation path: its `[breaking]` Changeset
   describing the change, with the replacement and migration where they help the

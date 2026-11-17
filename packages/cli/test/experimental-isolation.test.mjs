@@ -50,6 +50,7 @@ import {CLI_ROOT} from '../foundation/fs/paths.mjs';
 import {runCli} from '../test-utils/run-cli.mjs';
 import {startCliSequence} from '../test-utils/run-cli-sequence.mjs';
 import {writeIconSetProject} from '../test-utils/icon-set-fixture.mjs';
+import {SEARCHABLE_EXPERIMENTAL_GUIDES} from '../api/search/_gather-docs.mjs';
 
 const REPO_ROOT = path.resolve(CLI_ROOT, '..', '..');
 // Goldens come from the CLI without the feature: point these at a checkout of
@@ -476,6 +477,8 @@ async function searchGolden(query, cwd, run = cliRun) {
   );
   body.data.matchCount -= added.length;
   for (const result of body.data.results) {
+    // The shareable-page guides are FR27's named search exception.
+    if (SEARCHABLE_EXPERIMENTAL_GUIDES.has(result.name)) continue;
     expect(result).not.toHaveProperty('stability');
     expect(['icon', 'icon-set', 'icon-definition']).not.toContain(
       result.domain,
