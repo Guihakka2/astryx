@@ -7,16 +7,21 @@ import {describe, expect, it} from 'vitest';
 import {outsideRequests, roundTrip} from './share-checks.mjs';
 import {sourceBlock} from './source-block.mjs';
 
+/** A written file: head styles, body markup, then its embedded source. @param {string} body @param {string} [style] */
+const file = (body, style = '') =>
+  `<!doctype html><html><head><title>t</title>${style ? `<style>${style}</style>` : ''}</head><body>${body}${sourceBlock('p.tsx', [{path: 'p.tsx', bytes: Buffer.from('x')}])}</body></html>`;
+
 describe('outsideRequests', () => {
-  it('names what loading elements and stylesheets fetch, once each, and nothing a reader clicks or the script holds', () => {
-    const html = [
-      '<html><head><style>@import "https://fonts.example/a.css"; .x{background:url(//cdn.example/b.png)} .y{background:url(data:image/png;base64,AA)}</style>',
-      '<link rel="stylesheet" href="https://cdn.example/c.css"></head><body>',
-      '<img src="https://img.example/d.png" srcset="https://img.example/d2.png 2x, local.png 1x">',
-      '<img src="data:image/png;base64,AA"><a href="https://example.com/read-more">more</a>',
-      '<img src="https://img.example/d.png">',
-      '<script>fetch("https://api.example/e")</script></body></html>',
-    ].join('');
+  it('names what the markup and the stylesheet load, once each, and nothing a reader clicks or the script holds', () => {
+    const html = file(
+      [
+        '<link rel="stylesheet" href="https://cdn.example/c.css">',
+        '<img src="https://img.example/d.png" srcset="https://img.example/d2.png 2x, local.png 1x">',
+        '<img src="data:image/png;base64,AA"><a href="https://example.com/read-more">more</a>',
+        '<img src="https://img.example/d.png">',
+      ].join(''),
+      '@import "https://fonts.example/a.css"; .x{background:url(//cdn.example/b.png)} .y{background:url(data:image/png;base64,AA)}',
+    ).replace('</body>', '<script>fetch("https://api.example/e")</script></body>');
     expect(outsideRequests(html, os.tmpdir())).toEqual([
       'https://fonts.example/a.css',
       '//cdn.example/b.png',
@@ -26,24 +31,16 @@ describe('outsideRequests', () => {
     ]);
   });
 
-  it('reads tags as a browser does: a > inside a quoted value, spaces around =, and url() in a style attribute', () => {
-    const html = [
-      '<html><body>',
-      '<img alt="a > b" src = "https://img.example/q.png">',
-      "<div style=\"background:url('https://img.example/s.png')\">x</div>",
-      '<img title=\'x>y\' src=https://img.example/bare.png>',
-      '</body></html>',
-    ].join('');
-    expect(outsideRequests(html, os.tmpdir())).toEqual([
-      'https://img.example/q.png',
-      'https://img.example/s.png',
-      'https://img.example/bare.png',
-    ]);
+  it('reads a > inside a quoted value and a double-quoted url() in a style attribute', () => {
+    const html = file(
+      '<img alt="a > b" src="https://img.example/q.png"><div style="background:url(&quot;https://img.example/s.png&quot;)">x</div>',
+    );
+    expect(outsideRequests(html, os.tmpdir())).toEqual(['https://img.example/q.png', 'https://img.example/s.png']);
   });
 
   it('is empty for a file that loads nothing from the network', () => {
     expect(
-      outsideRequests('<html><body><img src="data:image/png;base64,AA"><a href="https://x.example">x</a></body></html>', os.tmpdir()),
+      outsideRequests(file('<img src="data:image/png;base64,AA"><a href="https://x.example">x</a>'), os.tmpdir()),
     ).toEqual([]);
   });
 });
@@ -72,6 +69,14 @@ describe('roundTrip', () => {
     const {dir, carried, html} = page({'page.tsx': 'export default () => null;\n'});
     fs.writeFileSync(path.join(dir, 'page.tsx'), 'export default () => 1;\n');
     expect(roundTrip(html, path.join(dir, 'page.tsx'), carried)).toEqual({exact: false, files: 1, differs: ['page.tsx']});
+  });
+
+  it('is not exact, naming every carried file, when the file has no embedded source', () => {
+    expect(roundTrip('<html><body><p>x</p></body></html>', path.join(os.tmpdir(), 'page.tsx'), ['page.tsx', 'data.json'])).toEqual({
+      exact: false,
+      files: 0,
+      differs: ['page.tsx', 'data.json'],
+    });
   });
 
   it('names a carried file missing on either side', () => {

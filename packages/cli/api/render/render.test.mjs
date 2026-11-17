@@ -1111,8 +1111,8 @@ describe('render(): every write stays inside the current folder', () => {
     expect(cli.status).toBe(0);
     expect(fs.existsSync(path.join(dir, 'styleattr/again.html'))).toBe(true);
     expect(cli.stdout).toMatch(/outside:\s+https:\/\/example\.com\/x\.png/);
-    expect(cli.stdout).toContain('When it opens, it loads https://example.com/x.png from the network.');
-    expect(cli.stdout).not.toContain('Nothing else needs to go with it.');
+    expect(cli.stdout).toContain('loads https://example.com/x.png from the network when it opens, so it does not stand alone.');
+    expect(cli.stdout).not.toContain('Share this one file');
   }, 60_000);
 
   it('carries a stylesheet pulled in by @import and gives it back, and says when one is missing', async () => {

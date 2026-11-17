@@ -12,25 +12,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {readSourceBlock} from './source-block.mjs';
-import {CSS_URL, assetRef, cssUrlRef, importParams} from './render-page.mjs';
-import {scanHtml} from './html-reader.mjs';
-
-/** Elements whose attributes load a resource when the file opens. */
-const LOADING = new Set(['img', 'script', 'link', 'iframe', 'object', 'embed', 'source', 'video', 'audio', 'track', 'input', 'image', 'use']);
-/** The attributes that load it. */
-const LOADING_ATTRS = new Set(['src', 'href', 'data', 'poster', 'srcset', 'xlink:href']);
+import {readSourceBlock, renderedHeadOf, renderedMarkupOf} from './source-block.mjs';
+import {assetRef, embeddedLoads, importParams, rewriteRefs} from './render-page.mjs';
 
 /**
  * Every outside address the file's markup and stylesheets load when it
- * opens: the src, href, data, poster and srcset of loading elements (a link
- * a reader clicks, `<a href>`, loads nothing), each url() of a `style`
- * attribute or `<style>` element, and each CSS import rule of a `<style>`
- * element.
- * Tags and attributes are read as the render reads its markup (scanHtml),
- * and each reference as the render reads the page's own (assetRef). The
- * page's own script is not read: what it fetches is the page's behavior,
- * not the file's.
+ * opens, read by the readers the render uses for the page: src, poster and
+ * srcset attributes and url() in style attributes (rewriteRefs), what link,
+ * iframe, object and embed elements load (embeddedLoads), and url() and the
+ * CSS import rules of the file's stylesheet. A link a reader clicks, `<a
+ * href>`, loads nothing. The page's own script is not read: what it fetches
+ * is the page's behavior, not the file's.
  * @param {string} html
  * @param {string} dir the folder the file sits in
  * @returns {string[]} each address once, in file order
@@ -42,31 +34,20 @@ export function outsideRequests(html, dir) {
   const add = value => {
     const ref = assetRef(value, {dir, root: dir});
     if (ref?.kind === 'remote') found.add(ref.ref);
+    return null;
   };
-  /** @param {string} css */
-  const addCss = css => {
-    // @import rules come first in a stylesheet, so file order holds.
+  const {style} = renderedHeadOf(html);
+  if (style) {
+    const css = style.replace(/^<style\b[^>]*>|<\/style>$/gi, '');
     for (const m of css.matchAll(/@import\s+([^;]+);?/gi)) {
       const url = importParams(m[1])?.url;
       if (url) add(url);
     }
-    for (const m of css.matchAll(new RegExp(CSS_URL.source, 'g'))) add(cssUrlRef(m));
-  };
-  let inStyle = false;
-  for (const token of scanHtml(html)) {
-    if (token.kind === 'start') {
-      inStyle = token.tag === 'style';
-      for (const [name, value] of token.attrs) {
-        if (name === 'style') addCss(value);
-        if (!LOADING.has(token.tag) || !LOADING_ATTRS.has(name)) continue;
-        if (name === 'srcset') {
-          for (const part of value.split(',')) add(part.trim().split(/\s+/)[0] ?? '');
-        } else add(value);
-      }
-    } else if (token.kind === 'raw' && inStyle) {
-      addCss(html.slice(token.start, token.end));
-    }
+    rewriteRefs(css, 'css', add);
   }
+  const markup = renderedMarkupOf(html) ?? '';
+  for (const {ref} of embeddedLoads(markup)) add(ref);
+  rewriteRefs(markup, 'html', add);
   return [...found];
 }
 

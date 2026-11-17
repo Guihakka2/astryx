@@ -94,7 +94,7 @@ export function registerExperimentalRender(group, program) {
             : []),
           section('Checks'),
           ...(d.checks.outside.length === 0
-            ? [text('The file loads nothing from the network.')]
+            ? [text("The file's markup and stylesheets load nothing from the network.")]
             : [record({outside: d.checks.outside.join(', ')})]),
           record({
             exact: d.checks.roundTrip.exact
@@ -102,11 +102,9 @@ export function registerExperimentalRender(group, program) {
               : `no: ${d.checks.roundTrip.differs.join(', ')} differ${d.checks.roundTrip.differs.length === 1 ? 's' : ''} from the files on disk`,
           }),
           text(
-            `Share this one file: ${d.output} (${kb(d.bytes)}), at ${path.resolve(d.output)}. ${
-              d.checks.outside.length === 0
-                ? 'Nothing else needs to go with it.'
-                : `When it opens, it loads ${d.checks.outside.join(', ')} from the network.`
-            }`,
+            d.checks.outside.length === 0
+              ? `Share this one file: ${d.output} (${kb(d.bytes)}), at ${path.resolve(d.output)}. Nothing else needs to go with it.`
+              : `${d.output} (${kb(d.bytes)}) loads ${d.checks.outside.join(', ')} from the network when it opens, so it does not stand alone.`,
           ),
           text(`Give it back: ${run} experimental render --reverse ${shellArg(d.output)}${restoreHere(d)}`),
         );

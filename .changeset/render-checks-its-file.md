@@ -2,6 +2,6 @@
 '@astryxdesign/cli': patch
 ---
 
-[feat] `astryx experimental render` checks the file it wrote and says so: whether the file loads anything from the network, and whether `--reverse` gives back every carried file exactly (`data.checks` in JSON), then names the one file to share with its size.
+[experimental] `astryx experimental render` checks the file it wrote and says so: whether the file's markup and stylesheets load anything from the network (the page's own script is not read), and whether `--reverse` gives back every carried file exactly, naming any that differ (`data.checks` in JSON). When the file stands alone, it names it as the one file to share, with its size.
 
 @josephfarina
