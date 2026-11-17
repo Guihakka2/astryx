@@ -95,6 +95,12 @@ const importedCss = [];
 /** Every local (non-package) module the page loaded, page first. */
 /** @type {string[]} */
 const localFiles = [];
+/**
+ * Modules and JSON files the page reaches by a relative import that lie
+ * outside the folder it carries from, so the file cannot carry them.
+ * @type {string[]}
+ */
+const outsideFiles = [];
 /** Package stylesheets the page imports, by specifier and importing file. */
 /** @type {{spec: string, from: string}[]} */
 const packageCss = [];
@@ -1643,6 +1649,14 @@ try {
       // and images a module imports, and a Sass file is never carried.
       if (target && /\.([cm]?[jt]sx?|json)$/i.test(target) && isLocal(target) && !localFiles.includes(target)) {
         localFiles.push(target);
+      } else if (
+        target &&
+        raw.startsWith('.') &&
+        !target.includes(NODE_MODULES) &&
+        !isLocal(target) &&
+        !outsideFiles.includes(target)
+      ) {
+        outsideFiles.push(target);
       }
     }
   }
@@ -1659,6 +1673,7 @@ try {
     chartsAlone,
     assets: [...assetsInlined],
     files: localFiles,
+    outsideFiles,
     aliasImports,
     texts,
     fnTexts,
