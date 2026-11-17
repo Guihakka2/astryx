@@ -1513,11 +1513,14 @@ export function NumberInput({
               inputRef.current?.focus();
               stepValue(1);
             }}
-            {...stylex.props(
-              styles.numberStepperButton,
-              interactionOverlayStyles.backgroundImage,
-              (isDisabled || isReadOnly || !canIncrement) &&
-                styles.numberStepperButtonDisabled,
+            {...mergeProps(
+              themeProps('number-input-stepper', {direction: 'increment'}),
+              stylex.props(
+                styles.numberStepperButton,
+                interactionOverlayStyles.backgroundImage,
+                (isDisabled || isReadOnly || !canIncrement) &&
+                  styles.numberStepperButtonDisabled,
+              ),
             )}>
             <Icon
               icon="numberInput:stepperDown"
@@ -1561,12 +1564,15 @@ export function NumberInput({
               inputRef.current?.focus();
               stepValue(-1);
             }}
-            {...stylex.props(
-              styles.numberStepperButton,
-              interactionOverlayStyles.backgroundImage,
-              styles.decrementButton,
-              (isDisabled || isReadOnly || !canDecrement) &&
-                styles.numberStepperButtonDisabled,
+            {...mergeProps(
+              themeProps('number-input-stepper', {direction: 'decrement'}),
+              stylex.props(
+                styles.numberStepperButton,
+                interactionOverlayStyles.backgroundImage,
+                styles.decrementButton,
+                (isDisabled || isReadOnly || !canDecrement) &&
+                  styles.numberStepperButtonDisabled,
+              ),
             )}>
             <Icon icon="numberInput:stepperDown" size="xsm" color="inherit" />
           </button>
