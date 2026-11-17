@@ -5,11 +5,13 @@ Core UI components, theme system, and utilities for the Astryx design system. Fo
 > **Building with an AI agent?** Add the CLI, then run `init`:
 >
 > ```bash
-> npm install -D @astryxdesign/cli   # or: pnpm add -D / yarn add -D / bun add -d
-> npx @astryxdesign/cli init         # the CLI you just installed
+> npm install -D -E @astryxdesign/cli@<core version>   # or: pnpm add -D -E / yarn add -D -E / bun add -d --exact
+> npx @astryxdesign/cli init                           # the CLI you just installed
 > ```
 >
-> `init` writes the Astryx component index into your `AGENTS.md`/`CLAUDE.md` so your agent discovers components, templates, and design tokens instead of guessing. Need a single command without installing? The same scoped command works: `npx @astryxdesign/cli <cmd>`. Always use the scoped name: the unscoped `astryx` resolves to an unrelated npm package until `@astryxdesign/cli` is a dependency. See [XDS CLI](#xds-cli).
+> Use the version of `@astryxdesign/core` you have. Keep `-E` when `package.json` pins Core exactly, as the starters do; leave it out when Core has a `^` or `~` range.
+>
+> `init` writes the Astryx component index into your `AGENTS.md`/`CLAUDE.md` so your agent discovers components, templates, and design tokens instead of guessing. Need a single command without installing? The same scoped command works: `npx @astryxdesign/cli <cmd>`. Always use the scoped name: the unscoped `astryx` resolves to an unrelated npm package until `@astryxdesign/cli` is a dependency. See [Astryx CLI](#astryx-cli).
 
 ## Component Docs
 
@@ -31,7 +33,7 @@ panel slots into common page patterns (dashboards, settings, forms, detail pages
 Wrap them in your own app chrome (`AppShell`, `TopNav`, `SideNav`) to add
 global navigation.
 
-Requires `@astryxdesign/cli` (`npm install -D @astryxdesign/cli`):
+Requires `@astryxdesign/cli` at Core's version (install it as the box at the top shows):
 
 ```bash
 astryx template --list              # browse all page and block templates
