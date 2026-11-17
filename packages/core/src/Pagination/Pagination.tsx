@@ -408,7 +408,9 @@ function PaginationButton({
   return (
     <Button
       {...props}
-      {...themeProps('pagination-item', {active: isCurrent ? 'active' : null})}
+      {...themeProps('pagination-item', {
+        selected: isCurrent ? 'selected' : null,
+      })}
       ref={ref}
     />
   );

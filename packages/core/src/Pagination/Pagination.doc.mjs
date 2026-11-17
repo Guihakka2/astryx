@@ -225,7 +225,7 @@ export const docs = {
     targets: [
       {className: 'astryx-pagination', visualProps: ['size', 'variant']},
       {className: 'astryx-pagination-list', visualProps: ['size', 'variant']},
-      {className: 'astryx-pagination-item', states: ['active']},
+      {className: 'astryx-pagination-item', states: ['selected']},
       {className: 'astryx-pagination-ellipsis'},
       {
         className: 'astryx-pagination-dot',
@@ -433,7 +433,7 @@ export const docsZh = {
     targets: [
       {className: 'astryx-pagination', visualProps: ['size', 'variant']},
       {className: 'astryx-pagination-list', visualProps: ['size', 'variant']},
-      {className: 'astryx-pagination-item', states: ['active']},
+      {className: 'astryx-pagination-item', states: ['selected']},
       {className: 'astryx-pagination-ellipsis'},
       {
         className: 'astryx-pagination-dot',

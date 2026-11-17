@@ -4,7 +4,7 @@
  * @file Pagination.targets.test.tsx
  * @input Pagination in the pages variant, with first/last in compact
  * @output Verifies the control row, its Button cells and the ellipsis carry
- *   their theme targets, the current page's cell reflects data-active, and
+ *   their theme targets, the current page's cell reflects data-selected, and
  *   the default markup otherwise matches the Button cells' own
  * @position Unit test for Pagination's joined-strip theme seams
  */
@@ -40,7 +40,7 @@ describe('Pagination theme targets', () => {
     );
 
     const current = items.filter(
-      item => item.getAttribute('data-active') === 'active',
+      item => item.getAttribute('data-selected') === 'selected',
     );
     expect(current).toHaveLength(1);
     expect(current[0]?.getAttribute('aria-current')).toBe('page');
@@ -63,6 +63,6 @@ describe('Pagination theme targets', () => {
     const items = container.querySelectorAll('.astryx-pagination-item');
     // First, previous, next, last.
     expect(items).toHaveLength(4);
-    expect(container.querySelector('[data-active]')).toBeNull();
+    expect(container.querySelector('[data-selected]')).toBeNull();
   });
 });
