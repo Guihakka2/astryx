@@ -534,6 +534,9 @@ const CASES = [
       );
     },
     jsonFieldAllowlist: ['warnings — listed under Warnings when present'],
+    textBlockAllowlist: [
+      'The file loads nothing from the network. — the text form of an empty checks.outside',
+    ],
   },
   {
     // The --reverse projection (same command, same folder as the case above).

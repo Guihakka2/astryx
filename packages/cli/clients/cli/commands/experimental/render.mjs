@@ -93,20 +93,20 @@ export function registerExperimentalRender(group, program) {
             ? [section('Warnings'), list(d.warnings.map(w => w.message))]
             : []),
           section('Checks'),
+          ...(d.checks.outside.length === 0
+            ? [text('The file loads nothing from the network.')]
+            : [record({outside: d.checks.outside.join(', ')})]),
+          record({
+            exact: d.checks.roundTrip.exact
+              ? `yes: --reverse gives back all ${d.checks.roundTrip.files} carried files byte for byte`
+              : `no: ${d.checks.roundTrip.differs.join(', ')} differ${d.checks.roundTrip.differs.length === 1 ? 's' : ''} from the files on disk`,
+          }),
           text(
-            d.checks.outside.length === 0
-              ? 'Offline: the file loads nothing from the network.'
-              : `Offline: no. The file loads ${d.checks.outside.join(', ')}.`,
-          ),
-          text(
-            d.checks.roundTrip.exact
-              ? `Round trip: --reverse gives back all ${d.checks.roundTrip.files} files exactly.`
-              : `Round trip: not exact: ${d.checks.roundTrip.differs.join(', ')} differ${d.checks.roundTrip.differs.length === 1 ? 's' : ''} from the files on disk.`,
-          ),
-          text(
-            d.checks.outside.length === 0
-              ? `Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). Nothing else needs to go with it.`
-              : `Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). When it opens, it loads ${d.checks.outside.join(', ')} from the network.`,
+            `Share this one file: ${d.output} (${kb(d.bytes)}), at ${path.resolve(d.output)}. ${
+              d.checks.outside.length === 0
+                ? 'Nothing else needs to go with it.'
+                : `When it opens, it loads ${d.checks.outside.join(', ')} from the network.`
+            }`,
           ),
           text(`Give it back: ${run} experimental render --reverse ${shellArg(d.output)}${restoreHere(d)}`),
         );

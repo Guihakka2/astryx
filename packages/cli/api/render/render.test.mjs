@@ -1110,7 +1110,7 @@ describe('render(): every write stays inside the current folder', () => {
     const cli = await runCli(['experimental', 'render', 'styleattr/page.tsx', '--out', 'styleattr/again.html'], {cwd: dir});
     expect(cli.status).toBe(0);
     expect(fs.existsSync(path.join(dir, 'styleattr/again.html'))).toBe(true);
-    expect(cli.stdout).toContain('Offline: no. The file loads https://example.com/x.png.');
+    expect(cli.stdout).toMatch(/outside:\s+https:\/\/example\.com\/x\.png/);
     expect(cli.stdout).toContain('When it opens, it loads https://example.com/x.png from the network.');
     expect(cli.stdout).not.toContain('Nothing else needs to go with it.');
   }, 60_000);
