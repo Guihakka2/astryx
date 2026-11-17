@@ -1180,6 +1180,16 @@ export async function renderPage(entry, options = {}) {
   };
   /** Stylesheets pulled in by another's `@import`. @type {Set<string>} */
   const carriedCss = new Set();
+  // The images the markup, the page's own CSS and its literals name are
+  // asked for together, so a machine with no network waits for one answer
+  // window, not one per text.
+  if (remote) {
+    await remote.get([
+      ...remoteRefsIn(markup, 'html', ctx),
+      ...(message.css ? remoteRefsIn(message.css, 'css', ctx) : []),
+      ...(typeof message.script === 'string' ? /** @type {string[]} */ (message.remoteLiterals ?? []) : []),
+    ]);
+  }
   try {
     markup = await inlineWithRemote(markup, 'html', ctx);
     // React adds `<link rel="preload">` hints for images it renders; in one

@@ -10,6 +10,7 @@
  * @position foundation/render — used by render-page.mjs
  */
 
+import * as https from 'node:https';
 import {MAX_ASSET_BYTES} from './assets.mjs';
 
 /** How long one image may take, from the request to its last byte. */
@@ -27,6 +28,84 @@ export const REMOTE_IMAGES_BUDGET_MS = 15000;
 
 /** How many images are fetched at once. */
 const AT_ONCE = 6;
+
+/** How many redirects a request follows. */
+const MOST_REDIRECTS = 5;
+
+/**
+ * A GET of `href` through Node's own client, answered as much of a fetch
+ * `Response` as the reader needs. A request the render stops closes its
+ * socket at once: a stopped fetch whose connect is still going keeps the
+ * process alive until the system gives up on the address. It sends no
+ * cookies, credentials or referrer, keeps no connection open, and follows a
+ * redirect only to an address of the same scheme.
+ * @param {string} href
+ * @param {{signal?: AbortSignal | null, headers?: Record<string, string>}} [init]
+ * @param {typeof https} [transport] another client for tests (node:http)
+ * @returns {Promise<any>}
+ */
+export function imageRequest(href, init = {}, transport = https) {
+  const scheme = new URL(href).protocol;
+  return new Promise((resolve, reject) => {
+    /** @param {string} url @param {number} redirects */
+    const go = (url, redirects) => {
+      const request = transport.get(
+        url,
+        {
+          agent: false,
+          headers: init.headers ?? {},
+          ...(init.signal ? {signal: init.signal} : {}),
+        },
+        response => {
+          const status = response.statusCode ?? 0;
+          const location = response.headers.location;
+          if (
+            status >= 300 &&
+            status < 400 &&
+            location &&
+            redirects < MOST_REDIRECTS
+          ) {
+            response.destroy();
+            const next = new URL(location, url);
+            if (next.protocol !== scheme) {
+              resolve({
+                ok: false,
+                status,
+                url: next.href,
+                headers: {get: () => null},
+                body: null,
+              });
+              return;
+            }
+            go(next.href, redirects + 1);
+            return;
+          }
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            url,
+            headers: {
+              /** @param {string} name */
+              get: name => {
+                const value = response.headers[name.toLowerCase()];
+                return Array.isArray(value)
+                  ? value.join(', ')
+                  : (value ?? null);
+              },
+            },
+            body: Object.assign(response, {
+              cancel: async () => {
+                response.destroy();
+              },
+            }),
+          });
+        },
+      );
+      request.on('error', reject);
+    };
+    go(href, 0);
+  });
+}
 
 /**
  * The image type that bytes are, by their leading bytes, or null for any
@@ -64,10 +143,10 @@ export function imageTypeOf(bytes) {
  * The remote images of one render. `get` fetches the addresses no earlier
  * call fetched, and `results` holds every answer by the address as the page
  * wrote it.
- * @param {{fetch?: typeof globalThis.fetch, timeoutMs?: number, answerMs?: number, budgetMs?: number, maxBytes?: number}} [options]
+ * @param {{fetch?: (href: string, init: any) => Promise<any>, timeoutMs?: number, answerMs?: number, budgetMs?: number, maxBytes?: number}} [options]
  */
 export function remoteImages({
-  fetch = globalThis.fetch,
+  fetch = imageRequest,
   timeoutMs = REMOTE_IMAGE_TIMEOUT_MS,
   answerMs = REMOTE_IMAGE_ANSWER_MS,
   budgetMs = REMOTE_IMAGES_BUDGET_MS,
@@ -75,6 +154,10 @@ export function remoteImages({
 } = {}) {
   /** @type {Map<string, RemoteImage>} */
   const results = new Map();
+  /** Every address asked for, in the order the render first named it. @type {Set<string>} */
+  const asked = new Set();
+  /** The answer of each address being fetched now. @type {Map<string, Promise<RemoteImage>>} */
+  const inflight = new Map();
   const budget = new AbortController();
   /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null;
@@ -82,11 +165,12 @@ export function remoteImages({
   const late = 'the render ran out of the time it gives remote images';
   const notAsked =
     'not asked: the network answered none of the first images the render asked for';
-  // Requests the network answered (any answer, an error status included),
-  // and requests it never answered. Once a request goes unanswered while
-  // none has an answer, the next request waits for every one in flight; if
-  // they all end with no answer, the machine has no network, so the render
-  // asks for no more.
+  // Requests the network answered with a success, and requests it never
+  // answered. An error status does not count as an answer: a proxy in front
+  // of a machine with no way out answers that way. Once a request goes
+  // unanswered while none has succeeded, the next request waits for every
+  // one in flight; if none of them succeeded, the machine has no network,
+  // so the render asks for no more.
   let answered = 0;
   let unanswered = 0;
   let inFlight = 0;
@@ -165,7 +249,7 @@ export function remoteImages({
    * @returns {Promise<RemoteImage>}
    */
   async function read(parsed, request) {
-    /** @type {Response} */
+    /** @type {any} */
     let response;
     const noAnswer = setTimeout(() => request.abort(), answerMs);
     try {
@@ -182,15 +266,15 @@ export function remoteImages({
       clearTimeout(noAnswer);
     }
     gotAnswer.add(request);
-    answered++;
+    if (response.ok) answered++;
     const stop = () => response.body?.cancel().catch(() => {});
-    if (!response.ok) {
-      stop();
-      return {reason: `the server answered ${response.status}`};
-    }
     if (response.url && !response.url.startsWith('https:')) {
       stop();
       return {reason: 'it moved to an address that is not https'};
+    }
+    if (!response.ok) {
+      stop();
+      return {reason: `the server answered ${response.status}`};
     }
     const type = (response.headers.get('content-type') ?? '')
       .split(';')[0]
@@ -232,8 +316,16 @@ export function remoteImages({
      * @param {Iterable<string>} urls as the page wrote them
      */
     async get(urls) {
-      const wanted = [...new Set(urls)].filter(url => !results.has(url));
-      if (wanted.length === 0) return;
+      const named = [...new Set(urls)];
+      // An address an earlier call is still fetching is waited for, not
+      // asked for again.
+      const earlier = named.filter(url => asked.has(url) && !results.has(url));
+      const wanted = named.filter(url => !asked.has(url));
+      for (const url of wanted) asked.add(url);
+      if (wanted.length === 0) {
+        await Promise.all(earlier.map(url => inflight.get(url)));
+        return;
+      }
       if (timer === null) {
         timer = setTimeout(() => budget.abort(), budgetMs);
         timer.unref?.();
@@ -244,12 +336,16 @@ export function remoteImages({
           if (noNetwork()) await settled();
           if (next >= wanted.length) return;
           const url = wanted[next++];
-          results.set(url, await one(url));
+          const answer = one(url);
+          inflight.set(url, answer);
+          results.set(url, await answer);
+          inflight.delete(url);
         }
       };
-      await Promise.all(
-        Array.from({length: Math.min(AT_ONCE, wanted.length)}, worker),
-      );
+      await Promise.all([
+        ...Array.from({length: Math.min(AT_ONCE, wanted.length)}, worker),
+        ...earlier.map(url => inflight.get(url)),
+      ]);
     },
     /** Stop the render's time limit. */
     done() {
@@ -264,7 +360,10 @@ export function remoteImages({
       const fetched = [];
       /** @type {{url: string, reason: string}[]} */
       const failed = [];
-      for (const [url, result] of results) {
+      // In the order the page names them, whichever answered first.
+      for (const url of asked) {
+        const result = results.get(url);
+        if (!result) continue;
         if ('uri' in result) fetched.push(url);
         else failed.push({url, reason: result.reason});
       }
