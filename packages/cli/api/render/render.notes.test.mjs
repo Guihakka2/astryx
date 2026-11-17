@@ -110,6 +110,7 @@ describe('a rendered file describes itself', () => {
     const run = `npx @astryxdesign/cli@${cliVersion()}`;
     expect(note).toContain(`astryx experimental render, @astryxdesign/cli ${cliVersion()}, render format 1.`);
     expect(note).toContain('Page: src/report.tsx');
+    expect(note).toMatch(/\n {2}Title: .+ \((from --title|from the page's first top-level heading; --title changes it|from the file name, as the page has no top-level heading; --title changes it)\)\n/);
     expect(note).toContain('Carried files (2): report.tsx, sections/Kpi.tsx');
     expect(note).toMatch(/Rendered with: @astryxdesign\/core \d+\.\d+\.\d+\S*, react \d/);
     expect(note).toContain(`${run} experimental render --reverse report.html`);

@@ -65,6 +65,8 @@ export {MODULE_EXTENSIONS, PAGE_EXTENSIONS} from './embedded-files.mjs';
  * @property {number} classes - Distinct class names in the markup.
  * @property {number} cssBytes - Bytes of inlined CSS.
  * @property {number} markupBytes - Bytes of rendered markup.
+ * @property {string} title - The file's title.
+ * @property {'title-option' | 'heading' | 'file-name'} titleFrom - Where the title comes from: --title, the page's first top-level heading, or the file name.
  * @property {number} images - Local files inlined as data: URIs.
  * @property {RenderWarning[]} warnings
  * @property {{name: string, dir: string}[]} fromSet - Packages that came from the package set the CLI runs from, not the page's folder.
@@ -1435,6 +1437,11 @@ export async function renderPage(entry, options = {}) {
     .exec(markup)?.[1]
     ?.replace(/<[^>]*>/g, '')
     .trim();
+  /**
+   * Where the title comes from: --title, the page's first top-level heading, or the file name.
+   * @type {'title-option' | 'heading' | 'file-name'}
+   */
+  const titleFrom = options.title !== undefined ? 'title-option' : heading ? 'heading' : 'file-name';
   const title =
     options.title ??
     (heading
@@ -1485,6 +1492,8 @@ export async function renderPage(entry, options = {}) {
         .filter(([name]) => !isServedPackage(name, []))
         .map(([name, version]) => `${name}@${version}`),
       ...(options.title === undefined ? {} : {title: options.title}),
+      shownTitle: title,
+      titleFrom,
     };
     // The file each alias import named, for the files the page carries, so a
     // reverse where no alias names it still finds the file.
@@ -1537,6 +1546,8 @@ export async function renderPage(entry, options = {}) {
     classes: used.size,
     cssBytes: Buffer.byteLength(css),
     markupBytes: Buffer.byteLength(markup),
+    title,
+    titleFrom,
     images: new Set([
       ...[...ctx.counted]
         .filter(k => k.startsWith('file:'))

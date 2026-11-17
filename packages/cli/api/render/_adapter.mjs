@@ -541,6 +541,8 @@ export async function renderToFile({cwd, input, output, title, absolute = false}
     stylesheets: page.stylesheets,
     classes: page.classes,
     cssBytes: page.cssBytes,
+    title: page.title,
+    titleFrom: page.titleFrom,
     images: page.images,
     warnings: page.warnings,
     scriptBytes: page.scriptBytes ?? 0,

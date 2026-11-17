@@ -1107,12 +1107,17 @@ describe('render(): every write stays inside the current folder', () => {
     // The check names what the written file loads; it never stops the write.
     expect(r.data.checks.outside).toEqual(['https://example.com/x.png']);
     expect(r.data.checks.roundTrip).toEqual({exact: true, files: 3, differs: []});
+    // A page with no top-level heading takes its title from the file name, and says so.
+    expect(r.data).toMatchObject({title: 'page', titleFrom: 'file-name'});
     const cli = await runCli(['experimental', 'render', 'styleattr/page.tsx', '--out', 'styleattr/again.html'], {cwd: dir});
     expect(cli.status).toBe(0);
     expect(fs.existsSync(path.join(dir, 'styleattr/again.html'))).toBe(true);
     expect(cli.stdout).toMatch(/outside:\s+https:\/\/example\.com\/x\.png/);
     expect(cli.stdout).toContain('loads https://example.com/x.png from the network when it opens, so it does not stand alone.');
     expect(cli.stdout).not.toContain('Share this one file');
+    expect(cli.stdout).toMatch(/^title:\s+page \(from the file name, as the page has no top-level heading; --title changes it\)$/m);
+    const titled = /** @type {any} */ (await render('styleattr/page.tsx', {cwd: dir, out: 'styleattr/titled.html', title: 'Status'}));
+    expect(titled.data).toMatchObject({title: 'Status', titleFrom: 'title-option'});
   }, 60_000);
 
   it('carries a stylesheet pulled in by @import and gives it back, and says when one is missing', async () => {

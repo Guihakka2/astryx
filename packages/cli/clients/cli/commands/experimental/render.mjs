@@ -16,6 +16,7 @@
 import * as path from 'node:path';
 import {getCliInvocation} from '../../../../foundation/env/package-manager.mjs';
 import {shellArg} from '../../../../foundation/text/shell-arg.mjs';
+import {titleSource} from '../../../../foundation/render/file-header.mjs';
 import {jsonOut} from '../../../../foundation/response/json.mjs';
 import {resultSet} from '../../../../foundation/debug/index.mjs';
 import {emit, section, text, record, list} from '../../formatters/index.mjs';
@@ -80,6 +81,7 @@ export function registerExperimentalRender(group, program) {
           record({
             input: d.input,
             output: d.output,
+            title: `${d.title} (${titleSource(d.titleFrom)})`,
             bytes: kb(d.bytes),
             cssBytes: kb(d.cssBytes),
             classes: d.classes,

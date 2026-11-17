@@ -50,6 +50,8 @@
  * @property {string[]} data.stylesheets - Package stylesheets that were cut to the rules the page uses and inlined.
  * @property {number} data.classes - Distinct class names in the markup.
  * @property {number} data.cssBytes - Size of the inlined CSS.
+ * @property {string} data.title - The file's title.
+ * @property {'title-option' | 'heading' | 'file-name'} data.titleFrom - Where the title comes from: `--title`, the page's first top-level heading, or the file name.
  * @property {number} data.images - Local files inlined as data: URIs.
  * @property {RenderWarning[]} data.warnings - Empty when nothing looked wrong.
  * @property {number} data.scriptBytes - Size of the page's script, which `bytes` includes.

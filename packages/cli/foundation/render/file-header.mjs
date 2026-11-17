@@ -44,7 +44,21 @@ const MAX_LISTED = 24;
  * @property {Record<string, string>} packages - The packages the page rendered with, by name: their versions.
  * @property {string[]} install - What a render outside a project must install first, as name@version.
  * @property {string} [title] - The title given with --title.
+ * @property {string} [shownTitle] - The file's title, whatever gave it.
+ * @property {'title-option' | 'heading' | 'file-name'} [titleFrom] - Where the title comes from.
  */
+
+/**
+ * Where a title comes from, in words, with how to change it.
+ * @param {'title-option' | 'heading' | 'file-name'} from
+ */
+export function titleSource(from) {
+  return from === 'title-option'
+    ? 'from --title'
+    : from === 'heading'
+      ? "from the page's first top-level heading; --title changes it"
+      : 'from the file name, as the page has no top-level heading; --title changes it';
+}
 
 /**
  * The note at the top of a rendered file.
@@ -69,6 +83,9 @@ export function headerNote(facts) {
     'It also carries the source of the page, so the page can come back exactly.',
     '',
     `Page: ${facts.page}`,
+    ...(facts.shownTitle !== undefined && facts.titleFrom && !/[<>]/.test(facts.shownTitle)
+      ? [`Title: ${facts.shownTitle} (${titleSource(facts.titleFrom)})`]
+      : []),
     `Carried files (${facts.files.length}): ${shown}${more}`,
     ...(versions.length > 0 ? [`Rendered with: ${versions.join(', ')}`] : []),
     '',
