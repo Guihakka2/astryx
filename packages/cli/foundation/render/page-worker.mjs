@@ -102,6 +102,25 @@ const packageCss = [];
 const skippedCss = [];
 /** https image addresses the page's own files name as literals, which the first paint may not show. @type {Set<string>} */
 const remoteLiterals = new Set();
+/**
+ * Of those, the addresses that count only because a name around them uses an
+ * image word (`imageUploadUrl`), never by their path or a `src`: such a name
+ * can hold an API's address. @type {Set<string>}
+ */
+const namedOnlyLiterals = new Set();
+/** The addresses that count by their path or a `src`. @type {Set<string>} */
+const placedLiterals = new Set();
+/**
+ * Record an https literal the render fetches as an image.
+ * @param {string} value
+ * @param {'path' | 'src' | 'name' | null} why
+ */
+function noteRemoteLiteral(value, why) {
+  if (!why) return;
+  remoteLiterals.add(value);
+  if (why === 'name') namedOnlyLiterals.add(value);
+  else placedLiterals.add(value);
+}
 /** https image addresses the page builds in code where an image goes, which a render cannot carry. @type {{text: string, file: string, line: number}[]} */
 const builtRemote = [];
 /** Local files inlined from asset imports. */
@@ -769,26 +788,31 @@ function reachesLink(p) {
 }
 
 /**
- * Whether an https address the page writes as a literal is an image the
+ * Why an https address the page writes as a literal is an image the
  * render fetches: its path ends in an image extension, it is the value of a
  * JSX `src`, `srcSet` or `poster`, or the property or attribute it is the
- * value of names an image. Any other address (a link, an API) is never
- * fetched.
+ * value of names an image. A link's address written in `href`, directly
+ * or through a variable named there, never counts, and no other address
+ * does.
  * @param {string} value
  * @param {any} p a path to the literal
+ * @returns {'path' | 'src' | 'name' | null} its path ends in an image
+ *   extension, it is a `src`, `srcSet` or `poster`, a name around it uses an
+ *   image word, or it is no image the render fetches
  */
-function isImageLiteral(value, p) {
-  if (!/^https:\/\//i.test(value)) return false;
+function imageLiteralKind(value, p) {
+  if (!/^https:\/\//i.test(value)) return null;
   const named = nameOfValue(p);
   // A link's address is where the reader goes, even when it names an image
   // file: the file keeps it as written.
-  if ((named && LINK_ATTR.test(named.name)) || reachesLink(p)) return false;
+  if ((named && LINK_ATTR.test(named.name)) || reachesLink(p)) return null;
   try {
-    if (IMAGE_PATH.test(new URL(value).pathname)) return true;
+    if (IMAGE_PATH.test(new URL(value).pathname)) return 'path';
   } catch {
-    return false;
+    return null;
   }
-  return Boolean(named && (SRC_ATTR.test(named.name) || namesImage(named.name)));
+  if (named && SRC_ATTR.test(named.name)) return 'src';
+  return named && namesImage(named.name) ? 'name' : null;
 }
 
 /**
@@ -985,13 +1009,13 @@ function pagePlugin(filename, browser = false) {
       },
       StringLiteral(/** @type {any} */ p) {
         if (browser || p.parentPath.isImportDeclaration() || p.parentPath.isExportDeclaration()) return;
-        if (isImageLiteral(p.node.value, p)) remoteLiterals.add(p.node.value);
+        noteRemoteLiteral(p.node.value, imageLiteralKind(p.node.value, p));
       },
       TemplateLiteral(/** @type {any} */ p) {
         if (browser || p.parentPath.isTaggedTemplateExpression()) return;
         if (p.node.expressions.length === 0) {
           const value = p.node.quasis[0]?.value.cooked ?? '';
-          if (isImageLiteral(value, p)) remoteLiterals.add(value);
+          noteRemoteLiteral(value, imageLiteralKind(value, p));
           return;
         }
         builtAddress(p, /^https:\/\//i.test(p.node.quasis[0]?.value.cooked ?? ''));
@@ -1834,6 +1858,7 @@ try {
     fnTexts,
     screenQueries,
     remoteLiterals: [...remoteLiterals],
+    remoteNamedOnly: [...namedOnlyLiterals].filter(url => !placedLiterals.has(url)),
     builtRemote,
     logs,
     script: script?.code ?? null,

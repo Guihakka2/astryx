@@ -592,6 +592,42 @@ describe('a render with images from the web', () => {
     }
   }, 120_000);
 
+  it('warns for an address counted by its path when its server answers with a page', async () => {
+    const dir = makeLinkedFixture('astryx-render-late-page-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const rows = [{url: 'https://example.com/shoe.png'}];",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>Show</button>{open && rows.map(r => <img key={r.url} src={r.url} alt="" />)}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch} = fetchFrom({
+        'https://example.com/shoe.png': respond(
+          '<!doctype html><title>Sign in</title>',
+          {headers: {'content-type': 'text/html'}},
+        ),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(page.warnings).toContainEqual({
+        code: 'remote-asset',
+        message:
+          "https://example.com/shoe.png, which the page's code names as an image, is loaded from the network when the script draws it, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: not an image.",
+      });
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
   it("never asks for an address a variable holds when the page uses it as a link's address", async () => {
     const dir = makeLinkedFixture('astryx-render-link-var-', [
       'react',

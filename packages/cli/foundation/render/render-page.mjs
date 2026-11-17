@@ -1237,6 +1237,7 @@ export async function renderPage(entry, options = {}) {
   // the script draws them from the same carried data.
   if (remote && script !== null) {
     const literals = /** @type {string[]} */ (message.remoteLiterals ?? []);
+    const namedOnly = new Set(/** @type {string[]} */ (message.remoteNamedOnly ?? []));
     await remote.get(literals);
     for (const url of literals) {
       const fetched = remote.results.get(url);
@@ -1245,10 +1246,11 @@ export async function renderPage(entry, options = {}) {
         if (!ctx.rewrites.has(url)) ctx.rewrites.set(url, fetched.uri);
         continue;
       }
-      // A server that answered with something that is not an image (an API's
-      // JSON, a page) names no image the file could carry: the result lists
-      // it, with no warning. An error status warns, as in the first paint.
-      if (fetched.answered) continue;
+      // An address that counts only by an image word in a name around it
+      // (`imageUploadUrl`) can be an API's: when its server answers with
+      // another type (JSON, a page), the result lists it, with no warning.
+      // Any other later-drawn address warns, as in the first paint.
+      if (fetched.answered && namedOnly.has(url)) continue;
       const key = `remote:${url}`;
       if (ctx.counted.has(key)) continue;
       ctx.counted.add(key);
