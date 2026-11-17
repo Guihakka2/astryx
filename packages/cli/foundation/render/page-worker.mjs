@@ -739,6 +739,36 @@ function nameOfValue(p) {
 }
 
 /**
+ * Whether a literal is the value of a variable that the page uses as a
+ * link's address (`const full = 'https://…/a.png'` with `<a href={full}>`).
+ * @param {any} p a path to the literal
+ */
+function reachesLink(p) {
+  let at = p;
+  while (
+    at.parentPath &&
+    (at.parentPath.isConditionalExpression() ||
+      at.parentPath.isLogicalExpression() ||
+      at.parentPath.isParenthesizedExpression?.() ||
+      at.parentPath.isTSAsExpression?.() ||
+      at.parentPath.isTSSatisfiesExpression?.())
+  ) {
+    at = at.parentPath;
+  }
+  const declarator = at.parentPath;
+  if (!declarator?.isVariableDeclarator() || declarator.node.init !== at.node) return false;
+  const id = declarator.node.id;
+  if (id.type !== 'Identifier') return false;
+  const binding = declarator.scope.getBinding(id.name);
+  return Boolean(
+    binding?.referencePaths.some((/** @type {any} */ ref) => {
+      const named = nameOfValue(ref);
+      return Boolean(named && LINK_ATTR.test(named.name));
+    }),
+  );
+}
+
+/**
  * Whether an https address the page writes as a literal is an image the
  * render fetches: its path ends in an image extension, it is the value of a
  * JSX `src`, `srcSet` or `poster`, or the property or attribute it is the
@@ -752,7 +782,7 @@ function isImageLiteral(value, p) {
   const named = nameOfValue(p);
   // A link's address is where the reader goes, even when it names an image
   // file: the file keeps it as written.
-  if (named && LINK_ATTR.test(named.name)) return false;
+  if ((named && LINK_ATTR.test(named.name)) || reachesLink(p)) return false;
   try {
     if (IMAGE_PATH.test(new URL(value).pathname)) return true;
   } catch {

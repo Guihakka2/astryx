@@ -126,9 +126,8 @@ export function imageRequest(href, init = {}, transport = https) {
 /**
  * @typedef {{uri: string} | {reason: string, answered?: boolean}} RemoteImage
  *   the data: URI the file carries, or why the image was not fetched;
- *   `answered` when the server answered with something that is not the
- *   image (an error status, another type, a redirect the render does not
- *   follow)
+ *   `answered` when the server answered with something that is not an
+ *   image (another type, such as JSON or a page)
  */
 
 /**
@@ -261,21 +260,15 @@ export function remoteImages({
     if (response.ok) answered++;
     const stop = () => response.body?.cancel().catch(() => {});
     if (response.badLocation) {
-      return {
-        reason: 'it moved to an address that is not valid',
-        answered: true,
-      };
+      return {reason: 'it moved to an address that is not valid'};
     }
     if (response.url && !response.url.startsWith('https:')) {
       stop();
-      return {
-        reason: 'it moved to an address that is not https',
-        answered: true,
-      };
+      return {reason: 'it moved to an address that is not https'};
     }
     if (!response.ok) {
       stop();
-      return {reason: `the server answered ${response.status}`, answered: true};
+      return {reason: `the server answered ${response.status}`};
     }
     const type = (response.headers.get('content-type') ?? '')
       .split(';')[0]

@@ -559,6 +559,69 @@ describe('a render with images from the web', () => {
     }
   }, 120_000);
 
+  it('warns for an image the script draws later when its server answers an error status', async () => {
+    const dir = makeLinkedFixture('astryx-render-late-404-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const user = {avatarUrl: 'https://example.com/gone'};",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>Me</button>{open && <img src={user.avatarUrl} alt="Me" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch} = fetchFrom({
+        'https://example.com/gone': respond('', {status: 404}),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(page.warnings).toContainEqual({
+        code: 'remote-asset',
+        message:
+          "https://example.com/gone, which the page's code names as an image, is loaded from the network when the script draws it, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: the server answered 404.",
+      });
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it("never asks for an address a variable holds when the page uses it as a link's address", async () => {
+    const dir = makeLinkedFixture('astryx-render-link-var-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const fullSize = 'https://cdn.example.com/shoe-large.png';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>More</button>{open && <a href={fullSize}>Full size</a>}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked).toEqual([]);
+      expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
+        '"https://cdn.example.com/shoe-large.png"',
+      );
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
   it('warns for an image the script draws later when its fetch fails', async () => {
     const dir = makeLinkedFixture('astryx-render-late-fail-', [
       'react',

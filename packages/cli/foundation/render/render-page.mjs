@@ -1245,9 +1245,9 @@ export async function renderPage(entry, options = {}) {
         if (!ctx.rewrites.has(url)) ctx.rewrites.set(url, fetched.uri);
         continue;
       }
-      // A server that answered with something that is not an image (an API,
-      // a page) names no image the file could carry: the result lists it,
-      // with no warning.
+      // A server that answered with something that is not an image (an API's
+      // JSON, a page) names no image the file could carry: the result lists
+      // it, with no warning. An error status warns, as in the first paint.
       if (fetched.answered) continue;
       const key = `remote:${url}`;
       if (ctx.counted.has(key)) continue;
