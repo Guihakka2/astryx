@@ -184,7 +184,7 @@ const decodeAttr = s =>
  * @param {string} params
  * @returns {{url: string, layer: string | null, supports: string | null, media: string} | null}
  */
-function importParams(params) {
+export function importParams(params) {
   const m =
     /^\s*(?:url\(\s*(['"]?)([\s\S]*?)\1\s*\)|(['"])([\s\S]*?)\3)\s*([\s\S]*)$/.exec(
       params,
@@ -886,10 +886,27 @@ function inlineAssets(text, kind, ctx) {
     if (!clean.startsWith('/')) ctx.localAssets.add(found);
     return assetDataUri(found);
   };
+  return rewriteRefs(text, kind, resolveRef, ctx.rewrites);
+}
+
+/**
+ * Each reference a page's markup or stylesheet loads, read once for every
+ * caller: the render inlines them, and the checks on a written file name the
+ * remote ones. In markup: src, poster and srcset attributes, and url() in
+ * style attributes; in a stylesheet: url(). `resolve` gets each reference as
+ * written and returns what replaces it, or null to keep it.
+ * @param {string} text
+ * @param {'html' | 'css'} kind
+ * @param {(ref: string) => string | null} resolve
+ * @param {Map<string, string>} [rewrites] each changed attribute value: its
+ *   text before and after
+ * @returns {string} the text with the replacements made
+ */
+export function rewriteRefs(text, kind, resolve, rewrites) {
   /** @param {string} value */
   const urls = value =>
     value.replace(new RegExp(CSS_URL.source, 'g'), (whole, ...rest) => {
-      const uri = resolveRef(
+      const uri = resolve(
         cssUrlRef(/** @type {any} */ ({groups: rest.at(-1)})),
       );
       return uri ? `url("${uri}")` : whole;
@@ -899,8 +916,8 @@ function inlineAssets(text, kind, ctx) {
     // React writes `srcSet` as it is spelled in JSX; HTML reads attribute
     // names in any case.
     .replace(/\s(src|poster)="([^"]*)"/gi, (whole, attr, ref) => {
-      const uri = resolveRef(ref);
-      if (uri) ctx.rewrites?.set(decodeAttr(ref), uri);
+      const uri = resolve(ref);
+      if (uri) rewrites?.set(decodeAttr(ref), uri);
       return uri ? ` ${attr}="${uri}"` : whole;
     })
     .replace(/\s(srcset)="([^"]*)"/gi, (whole, attr, set) => {
@@ -908,11 +925,11 @@ function inlineAssets(text, kind, ctx) {
         .split(',')
         .map(part => {
           const [ref, ...rest] = part.trim().split(/\s+/);
-          const uri = ref ? resolveRef(ref) : null;
+          const uri = ref ? resolve(ref) : null;
           return [uri ?? ref, ...rest].join(' ');
         });
       const rewritten = parts.join(', ');
-      if (rewritten !== decodeAttr(set)) ctx.rewrites?.set(decodeAttr(set), rewritten);
+      if (rewritten !== decodeAttr(set)) rewrites?.set(decodeAttr(set), rewritten);
       return ` ${attr}="${rewritten.replace(/"/g, '&quot;')}"`;
     })
     .replace(/\sstyle="([^"]*)"/g, (whole, style) => {
@@ -921,6 +938,47 @@ function inlineAssets(text, kind, ctx) {
       const css = urls(decodeAttr(style));
       return ` style="${css.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`;
     });
+}
+
+/**
+ * What a page's markup loads that the render does not carry, inline data
+ * and fragments aside, each once: the href, src or data of link, iframe,
+ * object and embed elements, the href or xlink:href of SVG image elements,
+ * the url(), CSS import rules and image-set() strings of style elements, and
+ * the image-set() strings of style attributes. The render warns about each,
+ * and the checks on a written file name every one of them.
+ * @param {string} markup
+ * @returns {Array<{tag: string, ref: string}>}
+ */
+export function embeddedLoads(markup) {
+  /** @type {Array<{tag: string, ref: string}>} */
+  const loads = [];
+  /** @type {Set<string>} */
+  const seen = new Set();
+  /** @param {string} tag @param {string} ref */
+  const add = (tag, ref) => {
+    const key = `${tag} ${ref}`;
+    if (!ref || /^(data:|#)/i.test(ref.trim()) || seen.has(key)) return;
+    seen.add(key);
+    loads.push({tag, ref});
+  };
+  /** The strings an image-set() names, which url() does not cover. @param {string} tag @param {string} css */
+  const imageSets = (tag, css) => {
+    for (const [, inner] of css.matchAll(/(?:-webkit-)?image-set\(([^()]*(?:\([^()]*\)[^()]*)*)\)/gi)) {
+      for (const m of inner.matchAll(/(?<![\w(])(["'])([^"']*)\1/g)) add(tag, m[2]);
+    }
+  };
+  for (const m of markup.matchAll(/<(link|iframe|object|embed)\b[^>]*?\s(?:href|src|data)="([^"]*)"/gi)) {
+    add(m[1].toLowerCase(), m[2]);
+  }
+  for (const m of markup.matchAll(/<image\b[^>]*?\s(?:xlink:href|href)="([^"]*)"/gi)) add('image', decodeAttr(m[1]));
+  for (const [, css] of markup.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    for (const m of css.matchAll(/@import\s+([^;]+);?/gi)) add('style', importParams(m[1])?.url ?? '');
+    for (const m of css.matchAll(new RegExp(CSS_URL.source, 'g'))) add('style', cssUrlRef(m));
+    imageSets('style', css);
+  }
+  for (const [, style] of markup.matchAll(/\sstyle="([^"]*)"/gi)) imageSets('element', decodeAttr(style));
+  return loads;
 }
 
 /**
@@ -1093,13 +1151,10 @@ export async function renderPage(entry, options = {}) {
           'The page renders a <script> element. A sandboxed viewer blocks it, and anywhere else it runs when the file is opened; remove it from the page.',
       });
     }
-    for (const m of markup.matchAll(
-      /<(link|iframe|object|embed)\b[^>]*?\s(?:href|src|data)="([^"]*)"/gi,
-    )) {
-      if (/^(data:|#)/i.test(m[2])) continue;
+    for (const {tag, ref} of embeddedLoads(markup)) {
       warnings.push({
         code: 'remote-asset',
-        message: `The page renders a <${m[1].toLowerCase()}> that loads ${m[2]}, which a sandboxed page cannot reach and which loads from the network anywhere else; remove it from the page.`,
+        message: `The page renders a <${tag}> that loads ${ref}, which a sandboxed page cannot reach and which loads from the network anywhere else; remove it from the page.`,
       });
     }
   } catch (e) {
