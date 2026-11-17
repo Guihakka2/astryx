@@ -754,14 +754,67 @@ describe('render(): every write stays inside the current folder', () => {
       config: 'tsconfig.json',
       paths: {'@/*': ['./src/*', './page-restored-3/src/*'], '@/components/Header': [`./${copy}`]},
       imports: [{import: '@/components/Header', file: copy}],
-      differs: [{import: '@/components/Header', project: 'src/components/Header.tsx', exists: true, file: copy}],
+      differs: [
+        {
+          import: '@/components/Header',
+          project: 'src/components/Header.tsx',
+          exists: true,
+          file: copy,
+          projectWide: true,
+          instead: [{file: 'page-restored-3/page-restored/app/page.tsx', import: '../../src/components/Header'}],
+        },
+      ],
     });
     expect(fs.readFileSync(path.join(cwd, copy), 'utf8')).toBe(header);
     expect(fs.readFileSync(path.join(cwd, 'src/components/Header.tsx'), 'utf8')).toContain('Changed header');
     put('alias-home/tsconfig.json', JSON.stringify({compilerOptions: {baseUrl: '.', paths: changed.data.aliased.paths}}));
     await render('page-restored-3/page-restored/app/page.tsx', {cwd, out: 'again.html'});
     expect(fs.readFileSync(path.join(cwd, 'again.html'), 'utf8')).toContain('Home header');
-  }, 60_000);
+    // The aliased file is the same, but a file it imports changed in the
+    // project: using the project's file would render the changed import, so
+    // the page's copies of both come back.
+    put('alias-deep/tsconfig.json', '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n');
+    put('alias-deep/package.json', '{"name":"alias-deep","private":true}');
+    put('alias-deep/src/components/Header.tsx', "import {mark} from './mark';\nexport function Header() { return <p>Deep header {mark}</p>; }\n");
+    const mark = "export const mark = 'sent mark';\n";
+    put('alias-deep/src/components/mark.ts', mark);
+    put('alias-deep/src/app/page.tsx', "import {Header} from '@/components/Header';\nexport default function Page() { return <Header />; }\n");
+    const deep = path.join(dir, 'alias-deep');
+    await render('src/app/page.tsx', {cwd: deep, out: 'page.html'});
+    // Unchanged: the page uses the project's files, and only the page is written.
+    const same = /** @type {any} */ (await render('page.html', {cwd: deep, reverse: true}));
+    expect(same.data.files).toEqual(['page-restored/app/page.tsx']);
+    expect(same.data.aliased).toEqual({imports: [], sameAsProject: [{import: '@/components/Header', file: 'src/components/Header.tsx'}]});
+    put('alias-deep/src/components/mark.ts', "export const mark = 'changed mark';\n");
+    const below = /** @type {any} */ (await render('page.html', {cwd: deep, reverse: true}));
+    expect(below.data.exact).toBe(true);
+    expect(below.data.files).toEqual([
+      'page-restored-2/app/page.tsx',
+      'page-restored-2/components/Header.tsx',
+      'page-restored-2/components/mark.ts',
+    ]);
+    expect(below.data.aliased.differs).toEqual([
+      {
+        import: '@/components/Header',
+        project: 'src/components/Header.tsx',
+        exists: true,
+        file: 'page-restored-2/components/Header.tsx',
+        changed: ['src/components/mark.ts'],
+        projectWide: true,
+        instead: [{file: 'page-restored-2/app/page.tsx', import: '../components/Header'}],
+      },
+    ]);
+    expect(fs.readFileSync(path.join(deep, 'page-restored-2/components/mark.ts'), 'utf8')).toBe(mark);
+    const {stdout} = await runCli(['experimental', 'render', '--reverse', 'page.html'], {cwd: deep});
+    expect(stdout).toContain("is the same as the page's copy, but files it imports differ here (src/components/mark.ts)");
+    expect(stdout).toContain('The "paths" below apply to the whole project');
+    expect(stdout).toContain("in page-restored-3/app/page.tsx, import '../components/Header'");
+    // The narrower fix, as the answer gives it: the restored page imports the copy by a relative path.
+    const restoredPage = path.join(deep, 'page-restored-2/app/page.tsx');
+    fs.writeFileSync(restoredPage, fs.readFileSync(restoredPage, 'utf8').replace("'@/components/Header'", "'../components/Header'"));
+    await render('page-restored-2/app/page.tsx', {cwd: deep, out: 'narrow.html'});
+    expect(fs.readFileSync(path.join(deep, 'narrow.html'), 'utf8')).toContain('sent mark');
+  }, 90_000);
 
   it('never edits a tsconfig.json: a reverse that needs an alias entry names the entry, the file it belongs in, and why', async () => {
     put('tsc-src/tsconfig.json', '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n');
@@ -798,11 +851,19 @@ describe('render(): every write stays inside the current folder', () => {
     const ownCwd = path.join(dir, 'tsc-own');
     const differs = /** @type {any} */ (await render('page.html', {cwd: ownCwd, reverse: true}));
     expect(differs.data.aliased.differs).toEqual([
-      {import: '@/components/Header', project: 'src/components/Header.tsx', exists: true, file: 'page-restored/components/Header.tsx'},
+      {
+        import: '@/components/Header',
+        project: 'src/components/Header.tsx',
+        exists: true,
+        file: 'page-restored/components/Header.tsx',
+        projectWide: true,
+        instead: [{file: 'page-restored/app/page.tsx', import: '../components/Header'}],
+      },
     ]);
     expect(differs.data.aliased.config).toBe('tsconfig.json');
     const text = (await runCli(['experimental', 'render', '--reverse', 'page.html'], {cwd: ownCwd})).stdout;
     expect(text).toContain('@/components/Header reaches src/components/Header.tsx in this project, which differs from the copy the page carries');
+    expect(text).toContain('every file that imports @/components/Header gets the page\'s copy instead of src/components/Header.tsx');
     expect(fs.readFileSync(path.join(ownCwd, 'tsconfig.json'), 'utf8')).toBe(aliased);
     expect(fs.readFileSync(path.join(ownCwd, 'src/components/Header.tsx'), 'utf8')).toBe(own);
   }, 60_000);

@@ -831,16 +831,25 @@ export function reverseToFile({cwd, input, output, overwrite}) {
       // Modules, stylesheets and JSON are written only when the page reaches
       // them through its own imports: one it never imports is not part of it,
       // whatever its name.
-      const {reached, missing} = reachableFiles(source.files, {aliases: receivingAliases(requested), recorded: source.aliases});
+      const aliases = receivingAliases(requested);
+      const first = reachableFiles(source.files, {aliases, recorded: source.aliases});
+      const {missing} = first;
+      let {reached} = first;
       // A carried image, font or media file needs no import to be part of the
       // page (it may be named in markup, a stylesheet, JSON or a computed
       // path): the render's own list is the authority, so it is kept when its
       // bytes are a known image, font or media format (any, whatever the
       // extension), and goes where the layout puts it.
+      /** @type {Set<string>} */
+      const listedAssets = new Set();
       for (const f of source.files) {
         if (reached.has(f.path) || !isAssetPath(f.path)) continue;
-        if (isAssetBytes(Buffer.from(f.base64, 'base64'))) reached.set(f.path, {relative: true, aliased: new Set(), unaliased: new Set()});
+        if (isAssetBytes(Buffer.from(f.base64, 'base64'))) listedAssets.add(f.path);
       }
+      const keepListedAssets = (/** @type {typeof reached} */ map) => {
+        for (const p of listedAssets) if (!map.has(p)) map.set(p, {relative: true, aliased: new Set(), unaliased: new Set()});
+      };
+      keepListedAssets(reached);
       const stray = source.files.filter(f => !reached.has(f.path)).map(f => f.path);
       if (stray.length > 0) {
         throw new AstryxError(
@@ -873,6 +882,38 @@ export function reverseToFile({cwd, input, output, overwrite}) {
       const home = folder ?? newFolderOf(requested);
       const within = (/** @type {string} */ file) => isInside(file, home);
       const target = path.join(anchor, path.basename(requested));
+      const byPath = new Map(source.files.map(f => [f.path, f]));
+      const carried = (/** @type {string} */ p) => Buffer.from(/** @type {{base64: string}} */ (byPath.get(p)).base64, 'base64');
+      const sameFile = (/** @type {string} */ file, /** @type {Buffer} */ bytes) => fs.existsSync(file) && fs.statSync(file).isFile() && fs.readFileSync(file).equals(bytes);
+      // A file an alias leads to outside the new folder is used as the
+      // project has it only when it and every carried file it reaches, where
+      // the project would find each one, are byte for byte the page's copies:
+      // otherwise the page would build against files it was not rendered with.
+      /** @type {Set<string>} */
+      const reused = new Set();
+      /** @type {Map<string, string[]>} */
+      const changedBelow = new Map();
+      for (const [p, r] of reached) {
+        for (const abs of r.aliased) {
+          if (abs === target || within(abs) || reused.has(abs) || changedBelow.has(abs) || !sameFile(abs, carried(p))) continue;
+          const sub = reachableFiles([/** @type {{path: string, base64: string}} */ (byPath.get(p)), ...source.files.filter(f => f.path !== p)], {aliases, recorded: {}});
+          /** @type {string[]} */
+          const changed = [];
+          for (const [q, below] of sub.reached) {
+            if (q === p) continue;
+            const where = [...(below.relative ? [path.resolve(path.dirname(abs), path.posix.relative(path.posix.dirname(p), q))] : []), ...below.aliased];
+            for (const file of where) if (!sameFile(file, carried(q))) changed.push(file);
+          }
+          if (changed.length === 0) reused.add(abs);
+          else changedBelow.set(abs, [...new Set(changed)].map(file => shown(cwd, file)).sort());
+        }
+      }
+      // What the page reaches when those files are the project's: what they
+      // import is the project's too, so its copies are not written.
+      if (reused.size > 0) {
+        reached = reachableFiles(source.files, {aliases, recorded: source.aliases, reused}).reached;
+        keepListedAssets(reached);
+      }
       /** @type {{file: string, bytes: Buffer}[]} */
       const writes = [];
       const placed = new Set();
@@ -884,10 +925,12 @@ export function reverseToFile({cwd, input, output, overwrite}) {
       const unaliased = [...reached].flatMap(([p, r]) => [...r.unaliased].map(spec => ({spec, file: placeFrom(p)})));
       /** @type {{import: string, file: string}[]} */
       const sameAsProject = [];
-      /** @type {{import: string, project: string, exists: boolean, file: string}[]} */
+      /** @type {{import: string, project: string, exists: boolean, file: string, changed?: string[], projectWide?: true, instead: {file: string, import: string}[]}[]} */
       const differs = [];
       source.files.forEach((f, i) => {
-        const reach = /** @type {import('../../foundation/render/embedded-imports.mjs').Reach} */ (reached.get(f.path));
+        const reach = reached.get(f.path);
+        // Reached only through a file the page uses as the project has it.
+        if (!reach) return;
         const bytes = Buffer.from(f.base64, 'base64');
         const own = i === 0 ? target : placeFrom(f.path);
         /** @param {string} file */
@@ -909,15 +952,29 @@ export function reverseToFile({cwd, input, output, overwrite}) {
             place(file);
             continue;
           }
-          const exists = fs.existsSync(file) && fs.statSync(file).isFile();
-          if (exists && fs.readFileSync(file).equals(bytes)) {
+          if (reused.has(file)) {
             for (const name of names) sameAsProject.push({import: name, file: shown(cwd, file)});
             continue;
           }
+          const exists = fs.existsSync(file) && fs.statSync(file).isFile();
+          const changed = changedBelow.get(file);
           place(own);
           for (const name of names) {
             unaliased.push({spec: name, file: own});
-            differs.push({import: name, project: shown(cwd, file), exists, file: shown(cwd, own)});
+            // The narrower fix than a `paths` entry, which every file in the
+            // project reads: each restored importer imports the copy by a
+            // relative path.
+            const instead = [...(reach.by?.get(name) ?? [])]
+              .filter(q => q === source.files[0].path || reached.get(q)?.relative)
+              .map(q => {
+                const from = q === source.files[0].path ? target : placeFrom(q);
+                let spec = path.relative(path.dirname(from), own).split(path.sep).join('/').replace(/\.[cm]?[jt]sx?$/, '');
+                if (!spec.startsWith('.')) spec = `./${spec}`;
+                return {file: shown(cwd, from), import: spec};
+              });
+            // With the project's file there, an entry that leads this import
+            // to the copy changes what every other importer of it gets too.
+            differs.push({import: name, project: shown(cwd, file), exists, file: shown(cwd, own), ...(changed ? {changed} : {}), ...(exists ? {projectWide: true} : {}), instead});
           }
         }
       });

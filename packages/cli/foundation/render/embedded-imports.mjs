@@ -271,6 +271,8 @@ export function receivingAliases(file) {
  *   import names for it, so it also goes there.
  * @property {Map<string, Set<string>>} [via] - For each path in `aliased`,
  *   the alias imports that name it there.
+ * @property {Map<string, Set<string>>} [by] - For each of those alias
+ *   imports, the tree paths of the files that make it.
  * @property {Set<string>} unaliased - Alias imports that name it where no
  *   receiving-project alias does: the render recorded the file each named,
  *   so it goes where the page's layout puts it, and the page needs the alias.
@@ -284,11 +286,13 @@ export function receivingAliases(file) {
  *   the receiving project's path aliases (see receivingAliases), and the
  *   alias imports the render recorded (an untrusted record: only an entry
  *   that names a carried file counts; without a record, each such import
- *   names the one carried file its path ends with)
+ *   names the one carried file its path ends with), and the absolute paths
+ *   whose project file the page uses as it is: a file an alias leads to
+ *   there is reached, but what it imports is not followed from it
  * @returns {{reached: Map<string, Reach>, missing: string[]}} the reached
  *   tree paths, and the relative imports the file does not carry
  */
-export function reachableFiles(files, {aliases = [], recorded} = {}) {
+export function reachableFiles(files, {aliases = [], recorded, reused} = {}) {
   const byPath = new Map(files.map(f => [f.path, f]));
   /** @type {Map<string, Reach>} */
   const reached = new Map();
@@ -347,9 +351,16 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
   };
   /** @type {string[]} */
   const queue = [];
+  const queued = new Set();
+  /** @param {string} p */
+  const follow = p => {
+    if (queued.has(p)) return;
+    queued.add(p);
+    queue.push(p);
+  };
   if (files.length > 0) {
     reach(files[0].path).r.relative = true;
-    queue.push(files[0].path);
+    follow(files[0].path);
   }
   while (queue.length > 0) {
     const current = /** @type {string} */ (queue.shift());
@@ -409,9 +420,8 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
           missing.add(joined);
           continue;
         }
-        const {r, fresh} = reach(target);
-        r.relative = true;
-        if (fresh) queue.push(target);
+        reach(target).r.relative = true;
+        follow(target);
         continue;
       }
       const match = matchPath(aliases, bare);
@@ -478,13 +488,17 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
           undefined,
         );
         if (chosen) {
-          const {r, fresh} = reach(chosen.hit.path);
+          const {r} = reach(chosen.hit.path);
           r.aliased.add(chosen.abs);
           r.via ??= new Map();
           const names = r.via.get(chosen.abs) ?? new Set();
           names.add(bare);
           r.via.set(chosen.abs, names);
-          if (fresh) queue.push(chosen.hit.path);
+          r.by ??= new Map();
+          const importers = r.by.get(bare) ?? new Set();
+          importers.add(current);
+          r.by.set(bare, importers);
+          if (!reused?.has(chosen.abs)) follow(chosen.hit.path);
         }
         continue;
       }
@@ -504,10 +518,10 @@ export function reachableFiles(files, {aliases = [], recorded} = {}) {
       const sent =
         typeof listed === 'string' ? listed : aliasOnly(bare) && !recorded ? derivedTarget(bare) : undefined;
       if (typeof sent === 'string' && byPath.has(sent)) {
-        const {r, fresh} = reach(sent);
+        const {r} = reach(sent);
         r.relative = true;
         r.unaliased.add(bare);
-        if (fresh) queue.push(sent);
+        follow(sent);
       }
     }
   }
