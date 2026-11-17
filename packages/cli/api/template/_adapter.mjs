@@ -2,8 +2,9 @@
 
 /**
  * @file The `template` subject's adapter for icon mapping (AST-084 FR9),
- * which reads the project's icon sets through the `Project` seam, and for the
- * not-found hint that names another lookup command.
+ * which reads the project's icon sets through the `Project` seam, for the
+ * project's component list, and for the not-found hint that names another
+ * lookup command.
  *
  * @position api/template — adapter read by the template dispatcher
  */
@@ -33,6 +34,42 @@ export async function loadTemplateIconSets(cwd) {
         reason: `The project could not be read, so no icon set applies: ${error instanceof Error ? error.message : String(error)}`,
       },
     };
+  }
+}
+
+/**
+ * Each component `astryx component --list` lists in the project, Core's and
+ * each configured integration's, mapped to its package. It reads the same
+ * kept list that command reads. A project whose components cannot be listed
+ * has none here, so no component is named.
+ * @param {string} cwd
+ * @returns {Promise<Map<string, string>>}
+ */
+export async function loadComponentCatalog(cwd) {
+  try {
+    const [{coreContentDir}, {componentList}] = await Promise.all([
+      import('../component/_adapter.mjs'),
+      import('../component/list/list.mjs'),
+    ]);
+    const list = await componentList(coreContentDir(cwd), {
+      cwd,
+      detail: 'brief',
+      zh: false,
+      dense: false,
+      lang: null,
+    });
+    /** @type {Map<string, string>} */
+    const catalog = new Map();
+    for (const entries of Object.values(list.data.components)) {
+      for (const entry of /** @type {Array<{name: string, package: string}>} */ (
+        entries
+      )) {
+        if (!catalog.has(entry.name)) catalog.set(entry.name, entry.package);
+      }
+    }
+    return catalog;
+  } catch {
+    return new Map();
   }
 }
 

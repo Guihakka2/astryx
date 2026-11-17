@@ -2086,17 +2086,20 @@ const UBIQUITOUS = new Set([
  * `function`, `class`, `const`, `let` or `var` declarations (exported or not).
  * `astryxImports` maps each local name of a named Astryx import to the name the
  * package exports, so `Text as AstryxText` maps `AstryxText` to `Text`. Both
- * are empty when the source does not parse, so a parse failure never drops a
- * real component.
+ * `importedFrom` maps the local name of every import, from any module, to that
+ * module. All are empty when the source does not parse, so a parse failure
+ * never drops a real component.
  *
  * @param {string} src
- * @returns {{declared: Set<string>, astryxImports: Map<string, string>}}
+ * @returns {{declared: Set<string>, astryxImports: Map<string, string>, importedFrom: Map<string, string>}}
  */
 function topLevelBindings(src) {
   /** @type {Set<string>} */
   const names = new Set();
   /** @type {Map<string, string>} */
   const astryxImports = new Map();
+  /** @type {Map<string, string>} */
+  const importedFrom = new Map();
   let program;
   try {
     program = babelParser().parse(src, {
@@ -2105,10 +2108,13 @@ function topLevelBindings(src) {
       errorRecovery: true,
     }).program;
   } catch {
-    return {declared: names, astryxImports};
+    return {declared: names, astryxImports, importedFrom};
   }
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
+      for (const specifier of statement.specifiers) {
+        importedFrom.set(specifier.local.name, statement.source.value);
+      }
       if (!statement.source.value.startsWith(ASTRYX_PACKAGE_SCOPE)) continue;
       for (const specifier of statement.specifiers) {
         if (specifier.type !== 'ImportSpecifier') continue;
@@ -2140,7 +2146,7 @@ function topLevelBindings(src) {
       }
     }
   }
-  return {declared: names, astryxImports};
+  return {declared: names, astryxImports, importedFrom};
 }
 
 /**
@@ -2165,6 +2171,45 @@ export function componentsInSource(src) {
   const known = readStore(TEMPLATE_COMPONENTS_FILE).get(storedKey(src));
   if (known) return [...known];
   return parsedComponents(src);
+}
+
+/**
+ * The components a template source composes that `astryx component` answers
+ * in the project, in the order the source first renders them. `catalog` maps
+ * each component name the project's component list holds to its package. A
+ * tag the source imports from a module outside Astryx and outside that
+ * package, such as a chart library's `Tooltip` or a local file's helper, is
+ * not that component, so it does not count.
+ * @param {string} src
+ * @param {ReadonlyMap<string, string>} catalog
+ * @returns {string[]}
+ */
+export function catalogComponentsInSource(src, catalog) {
+  const names = componentsInSource(src).filter(name => catalog.has(name));
+  if (names.length === 0) return [];
+  const {astryxImports, importedFrom} = topLevelBindings(src);
+  /** @type {Map<string, number>} */
+  const firstAt = new Map();
+  for (const tag of src.matchAll(JSX_TAG)) {
+    const local = tag[2];
+    const [name] = catalogNames([astryxImports.get(local) ?? local]);
+    if (name === undefined || firstAt.has(name)) continue;
+    const module = importedFrom.get(local);
+    const owner = catalog.get(name);
+    const ownModule =
+      module === undefined ||
+      module.startsWith(ASTRYX_PACKAGE_SCOPE) ||
+      module === owner ||
+      module.startsWith(`${owner}/`);
+    if (ownModule) firstAt.set(name, tag.index);
+  }
+  return names
+    .filter(name => firstAt.has(name))
+    .sort(
+      (a, b) =>
+        /** @type {number} */ (firstAt.get(a)) -
+        /** @type {number} */ (firstAt.get(b)),
+    );
 }
 
 export {TEMPLATE_COMPONENTS_FILE} from './template-source-tree.mjs';

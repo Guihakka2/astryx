@@ -17,6 +17,27 @@
       "@heroicons/react"
     ],
     "installCommand": "pnpm add @heroicons/react@\"^2.2.0\"",
+    "components": [
+      "Card",
+      "Divider",
+      "Stack",
+      "TextInput",
+      "Selector",
+      "Switch",
+      "Token",
+      "AspectRatio",
+      "Grid",
+      "SelectableCard",
+      "SegmentedControl",
+      "IconButton",
+      "Kbd",
+      "Tooltip",
+      "List",
+      "SideNav",
+      "Layout",
+      "Center",
+      "Dialog"
+    ],
     "isReady": true
   },
   "meta": {

@@ -13,6 +13,7 @@ import {AstryxError} from '../../error.mjs';
 import {ERROR_CODES} from '../../../foundation/response/error-codes.mjs';
 import {renderTokens} from '../../../foundation/doc-compiler/links.mjs';
 import {
+  catalogComponentsInSource,
   componentsInSource,
   pkgOf,
   replaceTemplateDemos,
@@ -25,11 +26,16 @@ import {
 /**
  * Build the `template.show` envelope for an already-resolved template.
  * @param {import('../../../foundation/discovery/template-adapter.mjs').DiscoveredTemplate} match
- * @param {{iconSets?: Parameters<typeof mapTemplateIcons>[1]}} [options]
- *   the project's icon sets; without them the template's icons are unchanged
+ * @param {{iconSets?: Parameters<typeof mapTemplateIcons>[1], catalog?: ReadonlyMap<string, string>}} [options]
+ *   `iconSets`: the project's icon sets; without them the template's icons
+ *   are unchanged. `catalog`: each component the project's component list
+ *   holds, with its package; without it `componentsToRead` is empty.
  * @returns {import('../template.type.mjs').TemplateShowResponse}
  */
-export function templateShow(match, {iconSets = NO_ICON_SETS} = {}) {
+export function templateShow(
+  match,
+  {iconSets = NO_ICON_SETS, catalog = new Map()} = {},
+) {
   if (!fs.existsSync(match.filePath)) {
     throw new AstryxError(
       `No source file found for template "${match.dirName}"`,
@@ -58,6 +64,7 @@ export function templateShow(match, {iconSets = NO_ICON_SETS} = {}) {
       description: renderTokens(match.description),
       type: match.type,
       components: componentsInSource(source),
+      componentsToRead: catalogComponentsInSource(source, catalog),
       source,
       demoMediaReplaced,
       demoContentReplaced,
