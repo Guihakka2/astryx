@@ -157,8 +157,10 @@ icon, and the CLI verifies it, writes the files, and checks the set.
   catalog that lists no `icon-set` item gives the output it gives without
   this feature. Where icon features are off, discover refuses
   `--type icon-set`. Where they are on, `icon-set` is a discover kind
-  (FR17). `astryx search` never reads icon
-  sets, whether icon features are on or off, and returns no experimental doc.
+  (FR17). `astryx search` never returns an
+  icon set or an experimental doc, whether icon features are on or off; only
+  where they are on does an icon set a saved discover copy lists count for its
+  discover line (`spec:AST-051/FR13`).
   Where icon features are off, no stable doc names an experimental route, an
   icon set, or an icon definition, and a stable docs
   node's previous and next links skip experimental neighbors; the one stable
