@@ -925,8 +925,11 @@ export function reverseToFile({cwd, input, output, overwrite}) {
       const unaliased = [...reached].flatMap(([p, r]) => [...r.unaliased].map(spec => ({spec, file: placeFrom(p)})));
       /** @type {{import: string, file: string}[]} */
       const sameAsProject = [];
-      /** @type {{import: string, project: string, exists: boolean, file: string, changed?: string[], projectWide?: true, instead: {file: string, import: string}[]}[]} */
+      /** @typedef {{import: string, project: string, exists: boolean, file: string, changed?: string[], projectWide: true, instead: {file: string, import: string}[]}} Differs */
+      /** @type {Differs[]} */
       const differs = [];
+      /** @type {{entry: Differs, importers: string[], copy: string}[]} */
+      const insteadFor = [];
       source.files.forEach((f, i) => {
         const reach = reached.get(f.path);
         // Reached only through a file the page uses as the project has it.
@@ -961,23 +964,29 @@ export function reverseToFile({cwd, input, output, overwrite}) {
           place(own);
           for (const name of names) {
             unaliased.push({spec: name, file: own});
-            // The narrower fix than a `paths` entry, which every file in the
-            // project reads: each restored importer imports the copy by a
-            // relative path.
-            const instead = [...(reach.by?.get(name) ?? [])]
-              .filter(q => q === source.files[0].path || reached.get(q)?.relative)
-              .map(q => {
-                const from = q === source.files[0].path ? target : placeFrom(q);
-                let spec = path.relative(path.dirname(from), own).split(path.sep).join('/').replace(/\.[cm]?[jt]sx?$/, '');
-                if (!spec.startsWith('.')) spec = `./${spec}`;
-                return {file: shown(cwd, from), import: spec};
-              });
-            // With the project's file there, an entry that leads this import
-            // to the copy changes what every other importer of it gets too.
-            differs.push({import: name, project: shown(cwd, file), exists, file: shown(cwd, own), ...(changed ? {changed} : {}), ...(exists ? {projectWide: true} : {}), instead});
+            // With it, an entry that leads this import to the copy changes
+            // what every other importer of it in the project gets too.
+            const entry = {import: name, project: shown(cwd, file), exists, file: shown(cwd, own), ...(changed ? {changed} : {}), projectWide: /** @type {const} */ (true), instead: /** @type {{file: string, import: string}[]} */ ([])};
+            differs.push(entry);
+            insteadFor.push({entry, importers: [...(reach.by?.get(name) ?? [])], copy: own});
           }
         }
       });
+      // The narrower fix than a `paths` entry, which every file in the
+      // project reads: each restored file that makes the import (the page, a
+      // file it reaches by a relative import, or another restored copy)
+      // imports the copy by a relative path. Known once every file is placed.
+      const relativeImport = (/** @type {string} */ from, /** @type {string} */ to) => {
+        const spec = path.relative(path.dirname(from), to).split(path.sep).join('/').replace(/\.[cm]?[jt]sx?$/, '');
+        return spec.startsWith('.') ? spec : `./${spec}`;
+      };
+      const restoredAt = (/** @type {string} */ q) =>
+        q === source.files[0].path ? [target] : [placeFrom(q), ...(reached.get(q)?.aliased ?? [])].filter(file => placed.has(file));
+      for (const {entry, importers, copy} of insteadFor) {
+        entry.instead = [...new Set(importers.flatMap(restoredAt))]
+          .sort()
+          .map(from => ({file: shown(cwd, from), import: relativeImport(from, copy)}));
+      }
       unaliased.sort((a, b) => (a.spec < b.spec ? -1 : a.spec > b.spec ? 1 : 0));
       const byImport = (/** @type {{import: string}} */ a, /** @type {{import: string}} */ b) => (a.import < b.import ? -1 : a.import > b.import ? 1 : 0);
       const aliased =

@@ -135,11 +135,7 @@ export function registerExperimentalRender(group, program) {
         ),
         ...(d.aliased?.differs ?? []).map(a =>
           text(
-            `${a.import} reaches ${a.project} in this project, which ${a.changed ? `is the same as the page's copy, but files it imports differ here (${a.changed.join(', ')})` : a.exists ? 'differs from the copy the page carries' : 'is not there'}. The page's copy came back as ${a.file}.${
-              a.exists
-                ? ` The "paths" below apply to the whole project: with them, every file that imports ${a.import} gets the page's copy instead of ${a.project}.${a.instead.length > 0 ? ` To change only the restored page, import the copy by a relative path instead: ${a.instead.map(x => `in ${x.file}, import '${x.import}'`).join('; ')}.` : ''}`
-                : ''
-            }`,
+            `${a.import} reaches ${a.project} in this project, which ${a.changed ? `is the same as the page's copy, but files it imports differ here (${a.changed.join(', ')})` : a.exists ? 'differs from the copy the page carries' : 'is not there'}. The page's copy came back as ${a.file}. The "paths" below apply to the whole project: with them, every file that imports ${a.import} gets the page's copy${a.exists ? ` instead of ${a.project}` : ''}.${(a.instead ?? []).length > 0 ? ` To change only the restored page, import the copy by a relative path instead: ${(a.instead ?? []).map(x => `in ${x.file}, import '${x.import}'`).join('; ')}.` : ''}`,
           ),
         ),
         ...(d.aliased?.imports.length && d.aliased.paths

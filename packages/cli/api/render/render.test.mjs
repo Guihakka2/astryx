@@ -816,6 +816,79 @@ describe('render(): every write stays inside the current folder', () => {
     expect(fs.readFileSync(path.join(deep, 'narrow.html'), 'utf8')).toContain('sent mark');
   }, 90_000);
 
+  it('gives the relative imports for a chain of restored copies, and for an alias whose file is not there', async () => {
+    const config = '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n';
+    put('alias-chain/tsconfig.json', config);
+    put('alias-chain/package.json', '{"name":"alias-chain","private":true}');
+    put('alias-chain/src/components/Icon.tsx', 'export function Icon() { return <i>sent icon</i>; }\n');
+    put('alias-chain/src/components/Header.tsx', "import {Icon} from '@/components/Icon';\nexport function Header() { return <p>Chain header <Icon /></p>; }\n");
+    put('alias-chain/src/app/page.tsx', "import {Header} from '@/components/Header';\nexport default function Page() { return <Header />; }\n");
+    const cwd = path.join(dir, 'alias-chain');
+    await render('src/app/page.tsx', {cwd, out: 'page.html'});
+    // Both files the alias reaches changed in the project since the render.
+    put('alias-chain/src/components/Icon.tsx', 'export function Icon() { return <i>changed icon</i>; }\n');
+    put('alias-chain/src/components/Header.tsx', "import {Icon} from '@/components/Icon';\nexport function Header() { return <p>Changed header <Icon /></p>; }\n");
+    const back = /** @type {any} */ (await render('page.html', {cwd, reverse: true}));
+    expect(back.data.files).toEqual(['page-restored/app/page.tsx', 'page-restored/components/Header.tsx', 'page-restored/components/Icon.tsx']);
+    expect(back.data.aliased.differs).toEqual([
+      {
+        import: '@/components/Header',
+        project: 'src/components/Header.tsx',
+        exists: true,
+        file: 'page-restored/components/Header.tsx',
+        projectWide: true,
+        instead: [{file: 'page-restored/app/page.tsx', import: '../components/Header'}],
+      },
+      {
+        import: '@/components/Icon',
+        project: 'src/components/Icon.tsx',
+        exists: true,
+        file: 'page-restored/components/Icon.tsx',
+        projectWide: true,
+        instead: [{file: 'page-restored/components/Header.tsx', import: './Icon'}],
+      },
+    ]);
+    // Following every `instead`, the restored page renders the page's own copies, not the project's changed files.
+    for (const {instead, import: spec} of back.data.aliased.differs) {
+      for (const {file, import: relative} of instead) {
+        const at = path.join(cwd, file);
+        fs.writeFileSync(at, fs.readFileSync(at, 'utf8').replace(`'${spec}'`, `'${relative}'`));
+      }
+    }
+    await render('page-restored/app/page.tsx', {cwd, out: 'narrow.html'});
+    const narrow = fs.readFileSync(path.join(cwd, 'narrow.html'), 'utf8');
+    expect(narrow).toContain('Chain header');
+    expect(narrow).toContain('sent icon');
+    expect(narrow).not.toContain('changed icon');
+    expect(fs.readFileSync(path.join(cwd, 'tsconfig.json'), 'utf8')).toBe(config);
+    // The alias is there but its file is not: the text names the whole-project reach and the relative import too.
+    put('alias-gone/tsconfig.json', config);
+    put('alias-gone/package.json', '{"name":"alias-gone","private":true}');
+    put('alias-gone-src/tsconfig.json', config);
+    put('alias-gone-src/package.json', '{"name":"alias-gone-src","private":true}');
+    put('alias-gone-src/src/components/Header.tsx', 'export function Header() { return <p>Gone header</p>; }\n');
+    put('alias-gone-src/src/app/page.tsx', "import {Header} from '@/components/Header';\nexport default function Page() { return <Header />; }\n");
+    await render('alias-gone-src/src/app/page.tsx', {cwd: dir});
+    fs.copyFileSync(path.join(dir, 'alias-gone-src/src/app/page.html'), path.join(dir, 'alias-gone/page.html'));
+    const gone = path.join(dir, 'alias-gone');
+    const missing = /** @type {any} */ (await render('page.html', {cwd: gone, reverse: true}));
+    expect(missing.data.aliased.differs).toEqual([
+      {
+        import: '@/components/Header',
+        project: 'src/components/Header.tsx',
+        exists: false,
+        file: 'page-restored/components/Header.tsx',
+        projectWide: true,
+        instead: [{file: 'page-restored/app/page.tsx', import: '../components/Header'}],
+      },
+    ]);
+    const {stdout} = await runCli(['experimental', 'render', '--reverse', 'page.html'], {cwd: gone});
+    expect(stdout).toContain('@/components/Header reaches src/components/Header.tsx in this project, which is not there');
+    expect(stdout).toContain('The "paths" below apply to the whole project: with them, every file that imports @/components/Header gets the page\'s copy.');
+    expect(stdout).toContain("in page-restored-2/app/page.tsx, import '../components/Header'");
+    expect(fs.readFileSync(path.join(gone, 'tsconfig.json'), 'utf8')).toBe(config);
+  }, 90_000);
+
   it('never edits a tsconfig.json: a reverse that needs an alias entry names the entry, the file it belongs in, and why', async () => {
     put('tsc-src/tsconfig.json', '{"compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["./src/*"]}}}\n');
     put('tsc-src/package.json', '{"name":"tsc-src","private":true}');
