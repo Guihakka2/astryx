@@ -346,7 +346,7 @@ own second parameter stops compiling.
 ### DEC-4 — The control row and its cells are Pagination's own targets
 
 **Reference:** `component:Pagination/DEC-4`
-**Decider:** `josephfarina`, `2026-11-16`
+**Decider:** maintainers, `2026-11-17`
 
 A theme draws the controls as one joined strip, as some design systems do: the
 row has the border, radius and shadow, cells are separated by a border, and
