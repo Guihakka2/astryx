@@ -22,12 +22,7 @@
  * - /packages/core/src/theme/index.ts
  */
 
-import {
-  tokenDefaults,
-  type DefinedTheme,
-  type TokenName,
-  type TokenValue,
-} from './defineTheme';
+import {tokenDefaults, type DefinedTheme, type TokenName} from './defineTheme';
 import {generatedScopedStatusRoleDefaults} from './generateThemeRules';
 import {resolveTokenReferences} from './tokenReferences';
 import {
