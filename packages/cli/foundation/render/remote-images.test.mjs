@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
-import {JSDOM} from 'jsdom';
+import {pageDom} from '../../test-utils/page-dom.mjs';
 import {render} from '../../api/render/render.mjs';
 import {imageRequest, imageTypeOf, remoteImages} from './remote-images.mjs';
 import {renderPage} from './render-page.mjs';
@@ -376,7 +376,7 @@ describe('a render with images from the web', () => {
       expect(markup).toContain('src="http://example.com/plain.png"');
       expect(asked.map(a => a.url)).toEqual(['https://example.com/shoe.png']);
       // The script draws the page with the same data.
-      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      const script = page.html.slice(page.html.lastIndexOf('<script type="module">'));
       expect(script).not.toContain('"https://example.com/shoe.png"');
       expect(page.remoteImages).toEqual({
         fetched: ['https://example.com/shoe.png'],
@@ -506,10 +506,7 @@ describe('a render with images from the web', () => {
       });
       // Opened after the click, offline: the avatars draw from the carried data.
       fs.writeFileSync(path.join(dir, 'page.html'), page.html);
-      const dom = new JSDOM(page.html, {
-        runScripts: 'dangerously',
-        pretendToBeVisual: true,
-      });
+      const dom = pageDom(page.html);
       const settle = () =>
         new Promise(resolve => dom.window.setTimeout(resolve, 100));
       await settle();

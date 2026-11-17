@@ -1609,7 +1609,11 @@ export async function renderPage(entry, options = {}) {
   // With a script, the markup sits in the one element the script draws into,
   // which takes no box of its own.
   const body = script ? `<div id="${ROOT_ID}">${markup}</div>` : markup;
-  const scriptTag = drawn ? `<script>${drawn}</script>\n` : '';
+  // A module script runs once the document is parsed, so a browser that
+  // reaches it before its first paint paints the markup first. A classic
+  // script at the end of the body would run before that paint on a page small
+  // enough to arrive at once.
+  const scriptTag = drawn ? `<script type="module">${drawn}</script>\n` : '';
   let html;
   if (options.output) {
     // The charset and generator metas come first: a browser reads the

@@ -11,7 +11,8 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {JSDOM, VirtualConsole} from 'jsdom';
+import {VirtualConsole} from 'jsdom';
+import {pageDom} from '../../test-utils/page-dom.mjs';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {render} from './render.mjs';
 import {doctor} from '../doctor/doctor.mjs';
@@ -80,7 +81,7 @@ const LABEL = `export const label = (n: number): string => \`Clicked \${n} times
 /** The page's script: the last script element, after the embedded source. @param {string} file */
 const scriptOf = file =>
   file.slice(
-    file.lastIndexOf('-->\n<script>') + '-->\n<script>'.length,
+    file.lastIndexOf('-->\n<script type="module">') + '-->\n<script type="module">'.length,
     file.lastIndexOf('</script>'),
   );
 
@@ -119,7 +120,7 @@ describe("a render, which carries the page's script", () => {
     expect(html).toContain(`<body><div id="${ROOT_ID}">`);
     expect(html).toContain(`#${ROOT_ID}{display:contents}`);
     const block = html.indexOf(`<script type="${SOURCE_TYPE}">`);
-    const script = html.lastIndexOf('-->\n<script>');
+    const script = html.lastIndexOf('-->\n<script type="module">');
     expect(block).toBeGreaterThan(0);
     expect(script).toBeGreaterThan(block);
     expect(html.endsWith('</script>\n</body></html>\n')).toBe(true);
@@ -192,10 +193,7 @@ describe("a render, which carries the page's script", () => {
 
   it('runs in a browser: the page draws itself over its markup and its button works', async () => {
     const errors = /** @type {string[]} */ ([]);
-    const dom = new JSDOM(html, {
-      runScripts: 'dangerously',
-      pretendToBeVisual: true,
-    });
+    const dom = pageDom(html);
     dom.window.addEventListener('error', e =>
       errors.push(String(/** @type {any} */ (e).message)),
     );
@@ -254,10 +252,7 @@ export default function Page() {
     expect(markup).toContain(
       '<a href="https://example.com/self" target="_self">Self</a>',
     );
-    const dom = new JSDOM(file, {
-      runScripts: 'dangerously',
-      pretendToBeVisual: true,
-    });
+    const dom = pageDom(file);
     const settle = () =>
       new Promise(resolve => dom.window.setTimeout(resolve, 50));
     await settle();
@@ -313,13 +308,10 @@ export default function Page() {
     // The script reads the image from the first paint: the file carries it
     // only where the markup shows it.
     const html = read('pictured.html');
-    const pageScript = html.slice(html.lastIndexOf('<script>'));
+    const pageScript = html.slice(html.lastIndexOf('<script type="module">'));
     expect(pageScript).not.toContain('data:image/png');
     expect(html.split('data:image/png;base64,').length - 1).toBe(3);
-    const dom = new JSDOM(html, {
-      runScripts: 'dangerously',
-      pretendToBeVisual: true,
-    });
+    const dom = pageDom(html);
     await new Promise(resolve => dom.window.setTimeout(resolve, 100));
     const doc = dom.window.document;
     const photo = doc.querySelector(`#${ROOT_ID} img[alt="Photo"]`);
@@ -358,11 +350,7 @@ export default function Page() {
     );
     await render('src/saves.tsx', {cwd: dir, out: 'saves.html'});
     // An opaque origin, as in a frame without allow-same-origin: storage throws.
-    const dom = new JSDOM(read('saves.html'), {
-      runScripts: 'dangerously',
-      pretendToBeVisual: true,
-      virtualConsole: new VirtualConsole(),
-    });
+    const dom = pageDom(read('saves.html'), {virtualConsole: new VirtualConsole()});
     await new Promise(resolve => dom.window.setTimeout(resolve, 100));
     expect(() => dom.window.localStorage).toThrow();
     const root = dom.window.document.getElementById(ROOT_ID);

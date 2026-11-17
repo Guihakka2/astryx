@@ -112,7 +112,7 @@ describe('render(): page to one HTML file', () => {
     expect(renderedMarkupOf(html)).not.toMatch(/<script\b/i);
     expect(html.split('<script type="application/x-astryx-source">')).toHaveLength(2);
     // The page's script follows the note after the embedded source.
-    expect(html).toMatch(/ -->\n<script>[^<]/);
+    expect(html).toMatch(/ -->\n<script type="module">[^<]/);
   });
 
   it('keeps text safe and the page title from its heading', () => {
