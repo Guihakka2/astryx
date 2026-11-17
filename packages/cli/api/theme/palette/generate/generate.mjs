@@ -356,7 +356,6 @@ export function themePaletteGenerate(
     throw newerRecipeRefusal({
       recipe: newer,
       file: path.relative(cwd, resolvedConfig),
-      by: 'the Astryx CLI',
       cwd,
     });
   }

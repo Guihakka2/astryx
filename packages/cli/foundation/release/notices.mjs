@@ -46,6 +46,7 @@ import {
   commandInFolder,
   detectPackageManager,
   getCliInvocation,
+  getDlxPrefix,
   installDependenciesCommand,
 } from '../env/package-manager.mjs';
 import {CLI_ROOT, findAstryxProject, findPackageRoot} from '../fs/paths.mjs';
@@ -694,6 +695,46 @@ export function noCliHintLine(answered, core, command, declared = false) {
  */
 export function addCliCommand(root, version) {
   return `${addVerbFor(root, version)} ${CLI_PACKAGE}@${version}`;
+}
+
+/**
+ * The step that updates the CLI for a run in `cwd`, as the update notices
+ * name it. In a project, its CLI and Core move together to the newest
+ * release, then the codemods run (see {@link projectLag}); when the newest
+ * release is not known yet, the same step names `latest`. From a folder inside
+ * the project whose package.json is not the project's, the step runs in the
+ * project's folder. Outside a project, the copy that ran updates: a global
+ * copy by the package manager that holds it (see
+ * {@link globalUpgradeCommand}); a package runner's copy by running the
+ * newest release (`runs`), as nothing installed it.
+ * @param {{cwd: string, self?: {version: string, root: string}, stateDir?: string}} options
+ * @returns {{command: string, runs: boolean}}
+ */
+export function cliUpdateStep({
+  cwd,
+  self = runningCopy(CLI_ROOT),
+  stateDir = userConfigDir(),
+}) {
+  const target = installFolder(cwd);
+  if (target == null) {
+    return isGlobalCopy(self.root)
+      ? {command: globalUpgradeCommand(self.root), runs: false}
+      : {command: `${getDlxPrefix(cwd)} ${LATEST}`, runs: true};
+  }
+  const root = target.moved
+    ? target.dir
+    : (projectRootOf(readReleaseFacts(cwd)) ?? cwd);
+  const current = projectRelease(root)?.version ?? self.version;
+  const lag = projectLag({cwd, current, stateDir});
+  if (lag) return {command: `${lag.install}, then ${lag.upgrade}`, runs: false};
+  const add = `${addVerbFor(root)} ${withCoreAt(root, 'latest')}`;
+  const upgrade = `${getCliInvocation(root, {installed: true})} upgrade --from ${current} --apply`;
+  return {
+    command: target.moved
+      ? `${commandInFolder(root, add)}, then ${commandInFolder(root, upgrade)}`
+      : `${add}, then ${upgrade}`,
+    runs: false,
+  };
 }
 
 /**

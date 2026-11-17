@@ -1416,7 +1416,7 @@ function planPalette(cwd, slug, data, base) {
   // official themes anchor a brand color in both modes.
   if (modes.includes('dark') && Object.keys(fills).length) {
     const t = tools(
-      generate(config, file),
+      generate(config, file, cwd),
       data,
       base,
       ownSourceTokenValues(cwd, slug),
@@ -2008,13 +2008,13 @@ export function syncPaletteRefs(cwd, slug, source, pal) {
 /**
  * @param {any} config
  * @param {string} [file] the config's path, for the refusal
+ * @param {string} [cwd] the theme's project, whose update step a config from
+ *   a newer CLI names
  * @returns {Candidate}
  */
-function generate(config, file = 'palette.config.json') {
+function generate(config, file = 'palette.config.json', cwd = process.cwd()) {
   const newer = newerRecipe(config?.recipe);
-  if (newer) {
-    throw newerRecipeRefusal({recipe: newer, file, by: 'the theme editor'});
-  }
+  if (newer) throw newerRecipeRefusal({recipe: newer, file, cwd});
   try {
     return generateTonalPalette(config);
   } catch (e) {
@@ -2106,7 +2106,7 @@ export function familyRamp(cwd, slug, data, base, family) {
       planPalette(cwd, slug, data, base)
     );
     const ramp = /** @type {any} */ (
-      generate(plan.config, paletteFiles(slug).config).palette
+      generate(plan.config, paletteFiles(slug).config, cwd).palette
     )[family];
     if (ramp?.light && ramp?.dark) return ramp;
   }
@@ -2149,7 +2149,7 @@ export function paletteMapping(cwd, slug, data, base, tokenDefaults) {
   if (!fams.length) return null;
   const plan = /** @type {PalettePlan} */ (planPalette(cwd, slug, data, base));
   const {config} = plan;
-  const candidate = generate(config, paletteFiles(slug).config);
+  const candidate = generate(config, paletteFiles(slug).config, cwd);
   const t = tools(candidate, data, base, ownSourceTokenValues(cwd, slug));
   const {
     stops,

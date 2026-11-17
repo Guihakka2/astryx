@@ -11,7 +11,7 @@
  */
 
 import {ERROR_CODES} from '../../../../foundation/response/error-codes.mjs';
-import {addCliCommand} from '../../../../foundation/release/notices.mjs';
+import {cliUpdateStep} from '../../../../foundation/release/notices.mjs';
 import {cliVersion} from '../../../../foundation/release/run-context.mjs';
 import {AstryxError} from '../../../error.mjs';
 import {PALETTE_RECIPES} from './generator.mjs';
@@ -38,16 +38,19 @@ export function newerRecipe(recipe) {
 
 /**
  * The refusal for a config a newer CLI made, keeping the code of every
- * palette generation refusal.
- * @param {{recipe: string, file: string, by: string, cwd?: string}} options
- *   `by` names what made the config: "the theme editor", "the Astryx CLI"
+ * palette generation refusal. The step it names fits where the CLI runs (see
+ * `cliUpdateStep`): in a project, its CLI and Core together.
+ * @param {{recipe: string, file: string, cwd?: string}} options
  * @returns {AstryxError}
  */
-export function newerRecipeRefusal({recipe, file, by, cwd = process.cwd()}) {
-  const update = addCliCommand(cwd, 'latest');
+export function newerRecipeRefusal({recipe, file, cwd = process.cwd()}) {
+  const step = cliUpdateStep({cwd});
+  const then = step.runs
+    ? `Run the command again with the newest CLI: ${step.command}`
+    : `Update the CLI, then run the command again: ${step.command}`;
   return new AstryxError(
-    `${file} was made with a newer version of ${by}: its colors use the ${recipe} recipe, and this CLI (${cliVersion()}) knows ${PALETTE_RECIPES.join(', ')}. Update the CLI, then run the command again: ${update}. Nothing was changed.`,
-    [{name: update, reason: `a CLI that knows the ${recipe} recipe`}],
+    `${file} was made with a newer Astryx CLI: its colors use the ${recipe} recipe, and this CLI (${cliVersion()}) knows ${PALETTE_RECIPES.join(', ')}. ${then}. Nothing was changed.`,
+    [{name: step.command, reason: `a CLI that knows the ${recipe} recipe`}],
     ERROR_CODES.ERR_PALETTE_GENERATION,
   );
 }

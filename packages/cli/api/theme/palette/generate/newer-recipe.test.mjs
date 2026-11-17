@@ -65,11 +65,12 @@ describe('a palette a newer CLI made', () => {
     );
     expect(error.code).toBe(ERROR_CODES.ERR_PALETTE_GENERATION);
     expect(error.message).toContain(
-      `palette.config.json was made with a newer version of the Astryx CLI: its colors use the ${NEWER} recipe`,
+      `palette.config.json was made with a newer Astryx CLI: its colors use the ${NEWER} recipe`,
     );
     expect(error.message).toContain(`knows ${PALETTE_RECIPES.join(', ')}`);
+    // The step fits where the CLI runs: this folder is in no project.
     expect(error.message).toMatch(
-      /Update the CLI, then run the command again: .*@astryxdesign\/cli@latest\. Nothing was changed\.$/,
+      /\. (Update the CLI, then run the command again|Run the command again with the newest CLI): .*@astryxdesign\/cli@latest\. Nothing was changed\.$/,
     );
     expect(error.suggestions?.[0]?.name).toMatch(/@astryxdesign\/cli@latest$/);
   });
@@ -93,9 +94,36 @@ describe('a palette a newer CLI made', () => {
     );
     expect(error.code).toBe(ERROR_CODES.ERR_PALETTE_GENERATION);
     expect(error.message).toContain(
-      `${paletteFiles('saved').config} was made with a newer version of the theme editor: its colors use the ${NEWER} recipe`,
+      `${paletteFiles('saved').config} was made with a newer Astryx CLI: its colors use the ${NEWER} recipe`,
     );
     expect(error.message).toMatch(/@astryxdesign\/cli@latest/);
+  });
+
+  it("in a project, names the step that moves the project's CLI and Core together", () => {
+    write('package.json', {
+      name: 'app',
+      dependencies: {'@astryxdesign/core': '0.7.1'},
+    });
+    write('package-lock.json', {lockfileVersion: 3});
+    write(paletteFiles('saved').config, {
+      recipe: NEWER,
+      families: [{id: 'accent', seed: '#5b3cc4'}],
+    });
+    const data = {
+      settings: [
+        {
+          source: /** @type {const} */ ('dial'),
+          thing: 'accent',
+          value: '#5b3cc4',
+        },
+      ],
+    };
+    const error = refusal(() =>
+      paletteMapping(cwd, 'saved', data, undefined, {}),
+    );
+    expect(error.message).toMatch(
+      /Update the CLI, then run the command again: npm install @astryxdesign\/core@\S+ @astryxdesign\/cli@\S+, then npx astryx upgrade --from 0\.7\.1 --apply\. Nothing was changed\.$/,
+    );
   });
 
   it('any other unknown recipe keeps the refusal of the generator', () => {
