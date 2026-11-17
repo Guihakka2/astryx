@@ -1,55 +1,93 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 /**
- * @file `astryx search` returns the experimental guides for sharing a page as
- * one HTML file, and still leaves every other experimental doc out
+ * @file In a project that depends on Astryx Core, `astryx search` returns the
+ * experimental guides for sharing a page as one HTML file, and still leaves
+ * every other experimental doc out. Anywhere else it answers without them
  * (spec:AST-017 FR27).
  */
 
-import {describe, expect, it} from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {runCli} from '../../test-utils/run-cli.mjs';
+import {
+  makeLinkedFixture,
+  removeLinkedFixture,
+} from '../../test-utils/linked-fixture.mjs';
 import {SEARCHABLE_EXPERIMENTAL_GUIDES as GUIDES} from './_gather-docs.mjs';
 
-/** @param {string} query */
-async function docs(query) {
-  const {status, stdout} = await runCli([
-    'search',
-    ...query.split(' '),
-    '--type',
-    'doc',
-    '--json',
+/** @type {string} */
+let tmp;
+/** @type {string} */
+let astryxApp;
+/** @type {string} */
+let plainApp;
+
+beforeAll(() => {
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-share-guides-'));
+  astryxApp = makeLinkedFixture('astryx-share-guides-app-', [
+    '@astryxdesign/core',
   ]);
+  plainApp = path.join(tmp, 'plain');
+  fs.mkdirSync(plainApp, {recursive: true});
+  fs.writeFileSync(
+    path.join(plainApp, 'package.json'),
+    JSON.stringify({
+      name: 'plain',
+      private: true,
+      dependencies: {react: '^19.2.0'},
+    }),
+  );
+});
+
+afterAll(() => {
+  removeLinkedFixture(astryxApp);
+  fs.rmSync(tmp, {recursive: true, force: true});
+});
+
+/** @param {string} query @param {string} cwd */
+async function docs(query, cwd) {
+  const {status, stdout} = await runCli(
+    ['search', ...query.split(' '), '--type', 'doc', '--json'],
+    cwd,
+  );
   expect(status).toBe(0);
   return /** @type {Array<{name: string, command: string}>} */ (
     JSON.parse(stdout).data.results
   );
 }
 
+/** @param {{command: string}} result */
+const isGuide = result =>
+  [...GUIDES].some(route => result.command.includes(`docs ${route}`));
+
 describe('search and the shareable-page guides', () => {
   it.each([...GUIDES])('%s is a docs route', async route => {
-    const {status} = await runCli(['docs', route, '--index']);
+    const {status} = await runCli(['docs', route, '--index'], astryxApp);
     expect(status).toBe(0);
   });
 
   it.each(['share', 'single file', 'static html', 'artifact', 'snapshot'])(
-    'a search for "%s" returns a shareable-page guide first',
+    'in an Astryx project, "%s" returns a shareable-page guide first',
     async query => {
-      const [first] = await docs(query);
-      expect(GUIDES.has(first.name)).toBe(true);
+      const [first] = await docs(query, astryxApp);
+      expect(isGuide(first)).toBe(true);
     },
   );
 
-  it('a shareable-page hit opens the guide on its experimental route', async () => {
-    const [first] = await docs('single file');
-    expect(first.command).toMatch(
-      /docs cli\/experimental\/(share-a-page|render-pages)/,
-    );
-  });
+  it.each(['share', 'single file', 'static html'])(
+    'in a project without Astryx, "%s" returns no shareable-page guide',
+    async query => {
+      expect((await docs(query, plainApp)).filter(isGuide)).toEqual([]);
+    },
+  );
 
   it('every other experimental doc stays out', async () => {
     for (const query of ['icon set', 'theme editor', 'experimental', 'share']) {
-      for (const result of await docs(query)) {
-        if (GUIDES.has(result.name)) continue;
+      for (const result of await docs(query, astryxApp)) {
+        if (isGuide(result)) continue;
         expect(result.name).not.toMatch(/experimental/);
         expect(result.command).not.toMatch(/experimental/);
       }
