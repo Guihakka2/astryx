@@ -7,11 +7,12 @@
  */
 
 import * as fs from 'node:fs';
+import * as http from 'node:http';
 import * as path from 'node:path';
-import {describe, expect, it} from 'vitest';
+import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {JSDOM} from 'jsdom';
 import {render} from '../../api/render/render.mjs';
-import {imageTypeOf, remoteImages} from './remote-images.mjs';
+import {imageRequest, imageTypeOf, remoteImages} from './remote-images.mjs';
 import {renderPage} from './render-page.mjs';
 import {readSourceBlock, renderedMarkupOf} from './source-block.mjs';
 import {ROOT_ID} from './client-bundle.mjs';
@@ -173,6 +174,29 @@ describe('remoteImages', () => {
     );
   });
 
+  it('counts no error status as the network answering, as a proxy with no way out answers', async () => {
+    const {fetch, asked} = fetchFrom({
+      'https://pay.example/badge.png': respond('', {status: 403}),
+      'https://cdn.example/a.svg': never,
+      'https://cdn.example/b.svg': never,
+    });
+    const remote = remoteImages({fetch, answerMs: 50, timeoutMs: 10_000});
+    const started = Date.now();
+    await remote.get([
+      'https://pay.example/badge.png',
+      'https://cdn.example/a.svg',
+    ]);
+    await remote.get(['https://cdn.example/b.svg']);
+    remote.done();
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(asked.map(a => a.url)).not.toContain('https://cdn.example/b.svg');
+    expect(remote.summary().failed.map(f => f.reason)).toEqual([
+      'the server answered 403',
+      'no answer within 0.05 s',
+      'not asked: the network answered none of the first images the render asked for',
+    ]);
+  });
+
   it('keeps asking when the network answers, even if one server is slow', async () => {
     const {fetch, asked} = fetchFrom({
       'https://slow.example/a.png': never,
@@ -195,6 +219,24 @@ describe('remoteImages', () => {
     ]);
   });
 
+  it('lists the addresses in the order the page names them, whichever answers first', async () => {
+    const {fetch} = fetchFrom({
+      'https://example.com/slow.png': () =>
+        new Promise(resolve => setTimeout(() => resolve(png()), 40)),
+      'https://example.com/fast.png': png(),
+    });
+    const remote = remoteImages({fetch});
+    await remote.get([
+      'https://example.com/slow.png',
+      'https://example.com/fast.png',
+    ]);
+    remote.done();
+    expect(remote.summary().fetched).toEqual([
+      'https://example.com/slow.png',
+      'https://example.com/fast.png',
+    ]);
+  });
+
   it('tells an image by its bytes', () => {
     expect(imageTypeOf(PNG)).toBe('image/png');
     expect(imageTypeOf(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe(
@@ -205,6 +247,100 @@ describe('remoteImages', () => {
     ).toBe('image/svg+xml');
     expect(imageTypeOf(Buffer.from('wOF2'))).toBeNull();
     expect(imageTypeOf(Buffer.from('<html><body>hi</body></html>'))).toBeNull();
+  });
+});
+
+describe('imageRequest', () => {
+  /** @type {http.Server} */
+  let server;
+  let base = '';
+  /** @type {http.IncomingHttpHeaders[]} */
+  const seen = [];
+  let holdClosed = false;
+  /** @type {() => void} */
+  let held = () => {};
+  const heldArrived = new Promise(resolve => {
+    held = () => resolve(undefined);
+  });
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      seen.push(req.headers);
+      if (req.url === '/hold') {
+        req.on('close', () => {
+          holdClosed = true;
+        });
+        held();
+        return;
+      }
+      if (req.url === '/moved') {
+        res.writeHead(302, {location: '/a.png'});
+        res.end();
+        return;
+      }
+      if (req.url === '/away') {
+        res.writeHead(302, {location: 'https://example.com/a.png'});
+        res.end();
+        return;
+      }
+      res.writeHead(200, {'content-type': 'image/png'});
+      res.end(PNG);
+    });
+    await new Promise(resolve =>
+      server.listen(0, '127.0.0.1', () => resolve(undefined)),
+    );
+    const address = /** @type {import('node:net').AddressInfo} */ (
+      server.address()
+    );
+    base = `http://127.0.0.1:${address.port}`;
+  });
+  afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(() => resolve(undefined)));
+  });
+
+  it('reads an image through a redirect of the same scheme, with no cookie and no open connection', async () => {
+    const answer = await imageRequest(
+      `${base}/moved`,
+      {headers: {accept: 'image/*'}},
+      /** @type {any} */ (http),
+    );
+    expect(answer.ok).toBe(true);
+    expect(answer.url).toBe(`${base}/a.png`);
+    expect(answer.headers.get('content-type')).toBe('image/png');
+    const chunks = [];
+    for await (const chunk of answer.body) chunks.push(chunk);
+    expect(Buffer.concat(chunks)).toEqual(PNG);
+    expect(
+      seen.every(
+        headers =>
+          headers.cookie === undefined && headers.authorization === undefined,
+      ),
+    ).toBe(true);
+    expect(seen.at(-1)?.connection).toBe('close');
+  });
+
+  it('does not follow a redirect to another scheme', async () => {
+    const answer = await imageRequest(
+      `${base}/away`,
+      {},
+      /** @type {any} */ (http),
+    );
+    expect(answer.ok).toBe(false);
+    expect(answer.url).toBe('https://example.com/a.png');
+  });
+
+  it('closes its socket at once when the render stops it', async () => {
+    const stop = new AbortController();
+    const asked = imageRequest(
+      `${base}/hold`,
+      {signal: stop.signal},
+      /** @type {any} */ (http),
+    );
+    await heldArrived;
+    stop.abort();
+    await expect(asked).rejects.toThrow();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(holdClosed).toBe(true);
   });
 });
 
