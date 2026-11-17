@@ -282,7 +282,7 @@ export function receivingAliases(file) {
  * The embedded files the page reaches through its imports.
  * @param {{path: string, base64: string}[]} files the embedded files, page
  *   first; every path appears once (callers refuse duplicates first)
- * @param {{aliases?: import('./ts-paths.mjs').PathPattern[], recorded?: unknown}} [options]
+ * @param {{aliases?: import('./ts-paths.mjs').PathPattern[], recorded?: unknown, reused?: Set<string>}} [options]
  *   the receiving project's path aliases (see receivingAliases), and the
  *   alias imports the render recorded (an untrusted record: only an entry
  *   that names a carried file counts; without a record, each such import
