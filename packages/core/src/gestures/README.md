@@ -657,10 +657,12 @@ in `../utils/touchPresentation.ts`:
 - a presentation that needs both, a sheet in place of a popover, asks for
   both (`COMPACT_TOUCH_QUERY`).
 
-Styles switch on the same conditions by writing the same query as a StyleX
-media key (`'@media (pointer: coarse)'`, and the compact-touch query spelled
-exactly as `COMPACT_TOUCH_QUERY`, which a test enforces), so the first paint
-is right. Behaviour reads
+Styles switch on the same conditions with StyleX media keys, so the first
+paint is right: `'@media (pointer: coarse)'` for touch, `COMPACT_STYLE_KEY`
+for compact, and the two nested `COMPACT_TOUCH_STYLE_KEYS` for both, each
+spelled exactly as the constant, which a test enforces. The compact key
+negates the size edges, because StyleX rewrites a range query to a length
+that also matches at the edge. Behaviour reads
 `useTouchPresentation()` (SSR-safe), a component with no interaction to
 infer from included (UIKit timings under a finger, its own motion under a
 mouse), and a decision taken once reads `readTouchPresentation()`.

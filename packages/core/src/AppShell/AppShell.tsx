@@ -88,6 +88,7 @@ import {
   DEFAULT_WIDTH_BREAKPOINTS,
   type WidthBreakpointName,
 } from '../theme/themeAdaptations';
+import {widthBelowFeature} from '../theme/sizeQueries';
 import type {AppShellVariantMap} from './index';
 
 import {useMergedRefs} from '../hooks/useMergedRefs';
@@ -622,13 +623,12 @@ export function AppShell({
   // Mobile nav open state (controlled + uncontrolled)
   // =========================================================================
   const activeWidthBreakpoints = activeTheme?.__adaptations?.widthBreakpoints;
-  const breakpointQuery =
+  const breakpointQuery = widthBelowFeature(
     sideNavBreakpoint === 'none'
-      ? '(width < 0px)'
-      : `(width < ${
-          activeWidthBreakpoints?.[sideNavBreakpoint] ??
-          DEFAULT_WIDTH_BREAKPOINTS[sideNavBreakpoint]
-        }px)`;
+      ? 0
+      : (activeWidthBreakpoints?.[sideNavBreakpoint] ??
+          DEFAULT_WIDTH_BREAKPOINTS[sideNavBreakpoint]),
+  );
   // The client's first answer can differ from the server's. That correction
   // is an urgent update, and it changes the mobile context above the page.
   // React answers an urgent update above content it has not hydrated by

@@ -33,6 +33,11 @@ import type {ColorScaleConfig} from './expandColorScale';
 import {resolveThemeValues, type ThemeValuesInput} from './resolveThemeValues';
 import {withoutUnsetComponents} from './mergeComponents';
 import {assertNoTokenCycles, resolveAdaptationLocalTokens} from './localTokens';
+import {
+  heightBelowFeature,
+  widthBelowFeature,
+  widthFromFeature,
+} from './sizeQueries';
 
 // =============================================================================
 // Public authoring vocabulary
@@ -84,8 +89,8 @@ const COMPACT_HEIGHT_BELOW = 500;
 export function compactDefinition(
   points: Readonly<Pick<WidthBreakpoints, 'md'>> = DEFAULT_WIDTH_BREAKPOINTS,
 ): CompactDefinition {
-  const width = `(width < ${points.md}px)`;
-  const height = `(height < ${COMPACT_HEIGHT_BELOW}px)`;
+  const width = widthBelowFeature(points.md);
+  const height = heightBelowFeature(COMPACT_HEIGHT_BELOW);
   return Object.freeze({
     widthBelow: points.md,
     heightBelow: COMPACT_HEIGHT_BELOW,
@@ -719,10 +724,10 @@ function mediaQueryForCondition(
       );
     }
     if (from !== undefined) {
-      parts.push(`(width >= ${points[from]}px)`);
+      parts.push(widthFromFeature(points[from]));
     }
     if (below !== undefined) {
-      parts.push(`(width < ${points[below]}px)`);
+      parts.push(widthBelowFeature(points[below]));
     }
   }
   if (condition.pointer !== undefined) {
