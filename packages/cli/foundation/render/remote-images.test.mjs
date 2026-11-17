@@ -94,6 +94,15 @@ describe('remoteImages', () => {
         headers: {'content-type': 'image/png'},
       }),
       'https://example.com/gone.png': respond('', {status: 404}),
+      'https://example.com/dropped.png': respond(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(PNG.subarray(0, 8)));
+            controller.error(new Error('connection reset'));
+          },
+        }),
+        {headers: {'content-type': 'image/png'}},
+      ),
     });
     const remote = remoteImages({fetch, timeoutMs: 50, maxBytes: 200});
     await remote.get([
@@ -104,6 +113,7 @@ describe('remoteImages', () => {
       'https://example.com/said-big.png',
       'https://example.com/is-big.png',
       'https://example.com/gone.png',
+      'https://example.com/dropped.png',
       'http://example.com/plain.png',
       'https://me:secret@example.com/private.png',
     ]);
@@ -120,6 +130,8 @@ describe('remoteImages', () => {
       'https://example.com/said-big.png': `larger than ${200 / 1048576} MB, the most a rendered page carries of one file`,
       'https://example.com/is-big.png': `larger than ${200 / 1048576} MB, the most a rendered page carries of one file`,
       'https://example.com/gone.png': 'the server answered 404',
+      'https://example.com/dropped.png':
+        'the connection closed before the image arrived',
       'http://example.com/plain.png': 'not an https address',
       'https://me:secret@example.com/private.png':
         'the address holds a user name or password, which a render never sends',
@@ -652,6 +664,100 @@ describe('a render with images from the web', () => {
       expect(asked).toEqual([]);
       expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
         '"https://cdn.example.com/shoe-large.png"',
+      );
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('fetches no first part of an address built with +, and warns for the built address', async () => {
+    const dir = makeLinkedFixture('astryx-render-plus-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          'export default function Page() {',
+          '  const [size, setSize] = useState(0);',
+          '  return <main><button onClick={() => setSize(640)}>Show</button>{size > 0 && <img src={\'https://cdn.example.com/hero.png?size=\' + size} alt="" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked).toEqual([]);
+      expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
+        'https://cdn.example.com/hero.png?size=',
+      );
+      expect(
+        page.warnings.some(
+          w =>
+            w.code === 'remote-asset' &&
+            w.message.includes('builds an image address in code'),
+        ),
+      ).toBe(true);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('carries each candidate of a srcSet the script draws later', async () => {
+    const dir = makeLinkedFixture('astryx-render-srcset-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>Show</button>{open && <img srcSet="https://example.com/a.png 1x, https://example.com/a@2x.png 2x" alt="" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({
+        'https://example.com/a.png': png(),
+        'https://example.com/a@2x.png': png(),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked.map(a => a.url).sort()).toEqual([
+        'https://example.com/a.png',
+        'https://example.com/a@2x.png',
+      ]);
+      const data = `data:image/png;base64,${PNG.toString('base64')}`;
+      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      expect(script).toContain(`${data} 1x, ${data} 2x`);
+      expect(script).not.toContain('https://example.com/a.png');
+      expect(page.warnings.filter(w => w.code === 'remote-asset')).toEqual([]);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('warns once for a first-paint image whose address has a query', async () => {
+    const dir = makeLinkedFixture('astryx-render-query-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        'export default function Page() { return <img src="https://example.com/a.png?w=2" alt="" />; }\n',
+      );
+      const {fetch} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(page.warnings.filter(w => w.code === 'remote-asset')).toHaveLength(
+        1,
       );
     } finally {
       removeLinkedFixture(dir);

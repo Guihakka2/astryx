@@ -185,7 +185,9 @@ export function remoteImages({
   const failure = request => {
     if (budget.signal.aborted) return late;
     if (gotAnswer.has(request)) {
-      return `the image did not arrive within ${timeoutMs / 1000} s`;
+      return request.signal.aborted
+        ? `the image did not arrive within ${timeoutMs / 1000} s`
+        : 'the connection closed before the image arrived';
     }
     unanswered++;
     return request.signal.aborted

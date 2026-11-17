@@ -869,7 +869,9 @@ function inlineAssets(text, kind, ctx) {
     if (named.kind === 'remote') {
       const fetched = ctx.remote?.get(named.url);
       if (fetched && 'uri' in fetched) return fetched.uri;
-      const key = `remote:${clean}`;
+      // Keyed by the whole address, as the later-drawn pass keys it, so one
+      // image gets one warning.
+      const key = `remote:${named.url}`;
       if (!ctx.counted.has(key)) {
         ctx.counted.add(key);
         ctx.warnings.push({
@@ -1258,6 +1260,19 @@ export async function renderPage(entry, options = {}) {
         code: 'remote-asset',
         message: `${url}, which the page's code names as an image, is loaded from the network when the script draws it, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: ${fetched.reason}.`,
       });
+    }
+    // A `srcSet` value the script sets becomes the same list with each
+    // fetched candidate's data in place of its address.
+    for (const value of /** @type {string[]} */ (message.remoteSrcsets ?? [])) {
+      const carried = value
+        .split(',')
+        .map(part => {
+          const [ref = '', ...rest] = part.trim().split(/\s+/);
+          const fetched = ref ? remote.results.get(ref) : undefined;
+          return [fetched && 'uri' in fetched ? fetched.uri : ref, ...rest].join(' ');
+        })
+        .join(', ');
+      if (carried !== value && !ctx.rewrites.has(value)) ctx.rewrites.set(value, carried);
     }
   }
   /** Built addresses named in a warning already. @type {Set<string>} */
@@ -1698,6 +1713,5 @@ export async function renderPage(entry, options = {}) {
     fromSet: message.fromSet ?? [],
     ...(pageScript ? {scriptBytes: Buffer.byteLength(pageScript), scriptModules: message.scriptModules ?? 0} : {}),
     ...(remote && remote.results.size > 0 ? {remoteImages: remote.summary()} : {}),
->>>>>>> 3d363638b98 ([experimental] render: carry each https image the page names, fetched once while it renders)
   };
 }

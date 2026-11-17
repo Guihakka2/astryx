@@ -110,16 +110,41 @@ const remoteLiterals = new Set();
 const namedOnlyLiterals = new Set();
 /** The addresses that count by their path or a `src`. @type {Set<string>} */
 const placedLiterals = new Set();
+/** Whole `srcSet` values whose https candidates the render fetches. @type {Set<string>} */
+const srcsetLiterals = new Set();
 /**
- * Record an https literal the render fetches as an image.
+ * Record an https literal the render fetches as an image. A `srcSet` value
+ * lists candidates (`a.png 1x, a@2x.png 2x`): each https one is an image.
  * @param {string} value
- * @param {'path' | 'src' | 'name' | null} why
+ * @param {'path' | 'src' | 'srcset' | 'name' | null} why
  */
 function noteRemoteLiteral(value, why) {
   if (!why) return;
+  if (why === 'srcset') {
+    const candidates = srcsetCandidates(value).filter(url => /^https:\/\//i.test(url));
+    if (candidates.length === 0) return;
+    srcsetLiterals.add(value);
+    for (const url of candidates) {
+      remoteLiterals.add(url);
+      placedLiterals.add(url);
+    }
+    return;
+  }
   remoteLiterals.add(value);
   if (why === 'name') namedOnlyLiterals.add(value);
   else placedLiterals.add(value);
+}
+
+/**
+ * The addresses a `srcset` value lists, one per candidate.
+ * @param {string} value
+ * @returns {string[]}
+ */
+function srcsetCandidates(value) {
+  return value
+    .split(',')
+    .map(part => part.trim().split(/\s+/)[0] ?? '')
+    .filter(Boolean);
 }
 /** https image addresses the page builds in code where an image goes, which a render cannot carry. @type {{text: string, file: string, line: number}[]} */
 const builtRemote = [];
@@ -796,9 +821,10 @@ function reachesLink(p) {
  * does.
  * @param {string} value
  * @param {any} p a path to the literal
- * @returns {'path' | 'src' | 'name' | null} its path ends in an image
- *   extension, it is a `src`, `srcSet` or `poster`, a name around it uses an
- *   image word, or it is no image the render fetches
+ * @returns {'path' | 'src' | 'srcset' | 'name' | null} its path ends in an
+ *   image extension, it is a `src` or `poster`, it is a `srcSet` (whose
+ *   candidates are the images), a name around it uses an image word, or it is
+ *   no image the render fetches
  */
 function imageLiteralKind(value, p) {
   if (!/^https:\/\//i.test(value)) return null;
@@ -806,6 +832,7 @@ function imageLiteralKind(value, p) {
   // A link's address is where the reader goes, even when it names an image
   // file: the file keeps it as written.
   if ((named && LINK_ATTR.test(named.name)) || reachesLink(p)) return null;
+  if (named && /^srcset$/i.test(named.name)) return 'srcset';
   try {
     if (IMAGE_PATH.test(new URL(value).pathname)) return 'path';
   } catch {
@@ -1009,11 +1036,15 @@ function pagePlugin(filename, browser = false) {
       },
       StringLiteral(/** @type {any} */ p) {
         if (browser || p.parentPath.isImportDeclaration() || p.parentPath.isExportDeclaration()) return;
+        // The first part of an address built with `+` is not an address: the
+        // chain gets its own warning.
+        if (p.parentPath.isBinaryExpression({operator: '+'})) return;
         noteRemoteLiteral(p.node.value, imageLiteralKind(p.node.value, p));
       },
       TemplateLiteral(/** @type {any} */ p) {
         if (browser || p.parentPath.isTaggedTemplateExpression()) return;
         if (p.node.expressions.length === 0) {
+          if (p.parentPath.isBinaryExpression({operator: '+'})) return;
           const value = p.node.quasis[0]?.value.cooked ?? '';
           noteRemoteLiteral(value, imageLiteralKind(value, p));
           return;
@@ -1859,6 +1890,7 @@ try {
     screenQueries,
     remoteLiterals: [...remoteLiterals],
     remoteNamedOnly: [...namedOnlyLiterals].filter(url => !placedLiterals.has(url)),
+    remoteSrcsets: [...srcsetLiterals],
     builtRemote,
     logs,
     script: script?.code ?? null,
