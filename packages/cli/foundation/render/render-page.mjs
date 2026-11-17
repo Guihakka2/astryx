@@ -33,6 +33,7 @@ import {
   RenderAssetError,
 } from './assets.mjs';
 import {classesIn, cutCss, layerOrderOf} from './css-cut.mjs';
+import {aliasClasses} from './class-alias.mjs';
 import {asParsed, formatFor, sha256, sourceBlock} from './source-block.mjs';
 import {LINK_OUT, ROOT_ID} from './client-bundle.mjs';
 import {remoteImages} from './remote-images.mjs';
@@ -1595,7 +1596,12 @@ export async function renderPage(entry, options = {}) {
       ? decodeAttr(heading)
       : path.basename(entry).replace(/\.[^.]+$/, ''));
   const generator = `<meta name="generator" content="Astryx${options.version ? ` ${escapeHtml(options.version)}` : ''}">`;
-  const style = `<style>${SCHEME_CSS}${script ? `#${ROOT_ID}{display:contents}` : ''}${markup.includes('class="recharts-responsive-container"') ? CHART_CSS : ''}${css}</style>`;
+  const drawsCharts = markup.includes('class="recharts-responsive-container"');
+  // A page that repeats an element repeats its StyleX class list: the first
+  // paint names each such list by one alias class (class-alias.mjs). The
+  // script draws its own elements with StyleX's classes.
+  if (script) ({markup, css} = aliasClasses(markup, css));
+  const style = `<style>${SCHEME_CSS}${script ? `#${ROOT_ID}{display:contents}` : ''}${drawsCharts ? CHART_CSS : ''}${css}</style>`;
   // With a script, the markup sits in the one element the script draws into,
   // which takes no box of its own.
   const body = script ? `<div id="${ROOT_ID}">${markup}</div>` : markup;

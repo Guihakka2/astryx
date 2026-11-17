@@ -339,6 +339,48 @@ export default function Page() {
     expect(read('pictured-back/pictured.tsx')).not.toContain(CARRY_ATTR);
   }, 120_000);
 
+  it('names a repeated StyleX class list by one alias in the first paint only, and still gives the page back', async () => {
+    const PAGE_SRC = `import {Button} from '@astryxdesign/core/Button';
+export default function Page() {
+  return (
+    <main>
+      {Array.from({length: 400}, (_, i) => (
+        <Button key={i} label={\`Row \${i}\`} />
+      ))}
+    </main>
+  );
+}
+`;
+    put('src/many.tsx', PAGE_SRC);
+    await render('src/many.tsx', {cwd: dir, out: 'many.html'});
+    const html = read('many.html');
+    const root = html.slice(html.indexOf(`<div id="${ROOT_ID}">`), html.indexOf('<script type="application/x-astryx-source"'));
+    // Every button keeps its Astryx name; its StyleX classes are one alias.
+    const lists = [...root.matchAll(/<button[^>]*\sclass="([^"]*)"/g)].map(m => m[1]);
+    expect(lists).toHaveLength(400);
+    expect(new Set(lists).size).toBe(1);
+    expect(lists[0]).toMatch(/^astryx-button(\s\S+)* _a[0-9a-z]+$/);
+    expect(lists[0]).not.toMatch(/\sx[0-9a-z]{5,}/);
+    const alias = /** @type {string} */ (lists[0].split(' ').at(-1));
+    expect(html).toContain(`.${alias}`);
+    // The script draws its own buttons with StyleX's classes.
+    const dom = new JSDOM(html, {runScripts: 'dangerously', pretendToBeVisual: true});
+    await new Promise(resolve => dom.window.setTimeout(resolve, 100));
+    const drawn = dom.window.document.querySelector(`#${ROOT_ID} button`)?.getAttribute('class') ?? '';
+    expect(drawn).not.toContain(alias);
+    expect(drawn).toMatch(/\sx[0-9a-z]{5,}/);
+    dom.window.close();
+    // The page comes back exactly, with no change reported.
+    const back = /** @type {any} */ (await render('many.html', {cwd: dir, reverse: true, out: 'many-back/many.tsx'}));
+    expect(back.data).toMatchObject({mode: 'embedded', exact: true, edited: false});
+    expect(read('many-back/many.tsx')).toBe(PAGE_SRC);
+    // Without its embedded source, the rebuild still finds the buttons.
+    put('many-stripped.html', html.replace(/<script type="application\/x-astryx-source">[\s\S]*?<\/script>/, ''));
+    const rebuilt = /** @type {any} */ (await render('many-stripped.html', {cwd: dir, reverse: true}));
+    expect(rebuilt.data.mode).toBe('rebuilt');
+    expect(rebuilt.data.components).toContain('Button');
+  }, 120_000);
+
   it("keeps the first paint when the page's script throws, as in a frame that blocks storage", async () => {
     put(
       'src/saves.tsx',
