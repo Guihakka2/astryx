@@ -400,9 +400,18 @@ function navigatesHere(event: React.MouseEvent<HTMLElement>): boolean {
  * Button replaces the element when the control starts or stops being a link.
  * The new element takes the focus.
  */
-function PaginationButton(props: React.ComponentProps<typeof Button>) {
+function PaginationButton({
+  isCurrent = false,
+  ...props
+}: React.ComponentProps<typeof Button> & {isCurrent?: boolean}) {
   const ref = useFocusAcrossSwap<HTMLButtonElement>();
-  return <Button {...props} ref={ref} />;
+  return (
+    <Button
+      {...props}
+      {...themeProps('pagination-item', {active: isCurrent ? 'active' : null})}
+      ref={ref}
+    />
+  );
 }
 
 // =============================================================================
@@ -696,9 +705,9 @@ export function Pagination({
                   <span
                     key={`ellipsis-${previousPage}-${nextPage}`}
                     aria-hidden="true"
-                    {...stylex.props(
-                      styles.ellipsis,
-                      isSm && styles.ellipsisSm,
+                    {...mergeProps(
+                      themeProps('pagination-ellipsis'),
+                      stylex.props(styles.ellipsis, isSm && styles.ellipsisSm),
                     )}>
                     …
                   </span>
@@ -717,6 +726,7 @@ export function Pagination({
                   {...controlProps(item, true)}
                   isDisabled={isDisabled}
                   aria-current={isActive ? 'page' : undefined}
+                  isCurrent={isActive}
                   xstyle={isActive && styles.activePage}>
                   {item}
                 </PaginationButton>
@@ -920,7 +930,10 @@ export function Pagination({
         </div>
       )}
       <div
-        {...stylex.props(styles.controls)}
+        {...mergeProps(
+          themeProps('pagination-list', {variant, size}),
+          stylex.props(styles.controls),
+        )}
         // A key or pointer press can arrive before that task. The click that
         // it starts counts from the current page too.
         onKeyDownCapture={countFromCurrentPage}

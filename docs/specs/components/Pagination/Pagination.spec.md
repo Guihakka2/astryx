@@ -12,6 +12,7 @@ owners: [cixzhang]
 review_triggers: [public-api, behavior, layout, theming, accessibility]
 verified_by:
   [
+    packages/core/src/Pagination/__tests__/Pagination.targets.test.tsx,
     packages/core/src/Pagination/Pagination.test.tsx,
     packages/core/src/Pagination/__tests__/PaginationLinks.a11y.browser.spec.ts,
     packages/core/src/Pagination/__tests__/PaginationTextSize.interaction.browser.spec.ts,
@@ -44,7 +45,7 @@ system_specs:
 | Public contract         | Pagination takes `page`, `onChange`, `changeAction`, `getPageHref`, `as`, `totalItems`, `totalPages`, `hasMore`, `pageSize`, `pageSizeOptions`, `onPageSizeChange`, `variant`, `pageLabel`, `hasFirstLast`, `step`, `siblingCount`, `size`, `isDisabled`, `label`, and base props.                                                                 |
 | Behavior                | A labelled navigation landmark with Previous and Next buttons around a variant-specific indicator. Every page change calls `onChange`, announces the new page, and runs an optional `changeAction` with an optimistic page. With `getPageHref`, the Button controls are links to each page's URL (FR16).                                           |
 | End-user impact         | People move through pages by buttons, page numbers, dots, or typing a page, and screen-reader users hear the page they landed on. A page link opens in a new tab, and its address can be copied. A control that becomes unavailable while it holds focus keeps that focus, as a button or as a link (FR13, FR19).                                  |
-| Builder impact          | With `getPageHref` the Button controls are links, and `onChange` still runs for them, so the caller does not navigate there (FR17). The dots, the page box, and the page-size selector stay controls (FR18).                                                                                                                                       |
+| Builder impact          | With `getPageHref` the Button controls are links, and `onChange` still runs for them, so the caller does not navigate there (FR17). The dots, the page box, and the page-size selector stay controls (FR18). A theme draws the controls as one joined strip through `pagination-list`, `pagination-item` and `pagination-ellipsis` (FR20).         |
 | Compatibility/readiness | Additive: `getPageHref` and `as` are optional, and `onChange` keeps its released type (DEC-3). No default changes. The dots render as a `radiogroup` of `radio` dots (FR9), a DOM and accessibility-tree change. The dots have no coarse-pointer hit area, and delegated Buttons carry their own gaps; both are listed under Current-state impact. |
 | Review checks           | Reject a page change outside 1 to the total, a page change without an announcement, a disabled Pagination that changes page, a landmark without a name, a delegated control re-themed by Pagination, a link on a disabled or unavailable control, or a page change from a click that the browser opens elsewhere.                                  |
 | Governing rules         | `spec:AST-020` FR15, DEC-4; `spec:AST-085` FR1, FR4, FR7; `spec:AST-086`; `spec:AST-094` FR42; `spec:AST-102` FR4; `family:navigation-destinations`; `component:Button` FR11; `design:bidirectionality` DR6; `design:reduced-motion` DR1; `architecture:component-theming-surface`; `architecture:internationalization` INV1a.                     |
@@ -63,7 +64,8 @@ and its four local theming targets. Consumer usage lives in
 
 - Released default preserved: `yes`; `variant="pages"`, `pageSize={10}`,
   `step={1}`, `siblingCount={1}`, `size="md"`
-- Compatibility class: additive; `getPageHref` and `as` are optional props,
+- Compatibility class: additive; the control row, its Button cells and the
+  ellipsis carry new targets (FR20) with no style change; `getPageHref` and `as` are optional props,
   and `onChange` keeps its released type (DEC-3); the dots' DOM changes from a
   `group` of `button`s named "Go to page N" with `aria-current="page"` to a
   `radiogroup` of `radio` dots named "Page N" with `aria-checked` (FR9)
@@ -91,7 +93,6 @@ Consumer migration instructions belong in consumer docs and release notes.
 - Button, Text, NumberInput, or Selector presentation and targets; those remain
   owned by their respective components.
 - Button icon artwork or other internals of delegated controls.
-- A public target for Ellipsis; none exists (OQ2).
 - Fetching or slicing the data being paged — owned by the caller.
 - The link element of a page link and the acceptance of its destination —
   owned by `component:Button` and `family:navigation-destinations`.
@@ -117,8 +118,8 @@ Consumer migration instructions belong in consumer docs and release notes.
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | FR1  | The current render contains one Pagination landmark (`<nav>` named by `label`, else the localized "Pagination", unless a caller's `aria-labelledby` names it) and Previous/next buttons. Page-size selector, First/last buttons, Page number buttons, Ellipsis, Count readout, Compact readout, Dots, Page input label, Page input, and Page input total appear only when their existing conditions are met. Pagination renders nothing when `totalItems` or the resolved page count is zero or less.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Current source and tests                                                                                 |
 | FR2  | Pagination, Dot, Page input label, and Page input total carry the four current local targets `pagination` (with `data-variant` and `data-size`), `pagination-dot` (`data-active`, `data-size`), `pagination-input-label` (`data-size`), and `pagination-input-total` (`data-size`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `architecture:component-theming-surface`; current source                                                 |
-| FR3  | Page-size selector delegates to Selector; First/last, Previous/next, and Page number buttons delegate to Button; Count and Compact readouts delegate to Text; Page input delegates to NumberInput. Page number buttons grow with their label as `component:Button` FR4 says, and Ellipsis takes its size as a minimum height, so both grow with a larger text size and a wrapped row never covers another (`spec:AST-102` FR4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Current source; `component:Button` FR4; `spec:AST-102` FR4                                               |
-| FR4  | Ellipsis is stable visible Pagination-rendered content in a numbered presentation, hidden from assistive technology, and currently carries no public target.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Current source                                                                                           |
+| FR3  | Page-size selector delegates to Selector; First/last, Previous/next, and Page number buttons delegate to Button and also carry `pagination-item` (FR20); Count and Compact readouts delegate to Text; Page input delegates to NumberInput. Page number buttons grow with their label as `component:Button` FR4 says, and Ellipsis takes its size as a minimum height, so both grow with a larger text size and a wrapped row never covers another (`spec:AST-102` FR4).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Current source; `component:Button` FR4; `spec:AST-102` FR4                                               |
+| FR4  | Ellipsis is stable visible Pagination-rendered content in a numbered presentation, hidden from assistive technology, and carries `pagination-ellipsis` (FR20).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Current source                                                                                           |
 | FR5  | The page count is `totalPages`, else `totalItems / pageSize` rounded up, else unknown. Previous is available above page 1; Next is available below the known count, or when `hasMore` with no count. Previous and Next move by `step`, clamped to 1 and the known count; First goes to 1 and Last to the count.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Current tests                                                                                            |
 | FR6  | Every page change calls `onChange(page)`, announces "Page X of Y" (or "Page X" without a count) through the shared polite channel, and runs `changeAction(page)` in a transition while the optimistic page shows. A later change while one is pending starts a fresh transition. Pagination shows no other pending treatment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `spec:AST-086`; current tests                                                                            |
 | FR7  | `pages` shows page buttons for the range when the count is known: every page when the count fits `5 + 2 × siblingCount` slots, otherwise, near an end, `3 + 2 × siblingCount` consecutive pages from that end, an ellipsis, and the other end (page 1 of 10 shows `1 2 3 4 5 … 10`); elsewhere the first page, an ellipsis, the current page with `siblingCount` neighbours, an ellipsis, and the last page. Each page button shows its number, is named "Go to page N", and the current one has `aria-current="page"`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Current tests                                                                                            |
@@ -134,6 +135,7 @@ Consumer migration instructions belong in consumer docs and release notes.
 | FR17 | A plain activation of a page link runs FR6, with the same `onChange(page)` call as a button control. Pagination does not cancel the click, so the link navigates, and the caller does not navigate in `onChange` for it. The browser follows the URL that was activated: the page change gives a Previous or Next link its next URL only after the click is over. A click that does not navigate this document runs none of FR6, because the page here did not change: a click with a modifier key (Control, Meta, Shift, or Alt), a click on a link whose `target` is set and is not `_self`, and a click on a link whose URL is rejected.                                                                                                                                                                                                                                                                                                                                                                                                                                                              | DEC-1; DEC-3; current tests                                                                              |
 | FR18 | The dots (FR9), the Page input (FR10), and the Page-size selector (FR11) are never links (DEC-2). With `getPageHref` they keep FR9 to FR11 and change the page through FR6. In the `dots` and `input` variants only Previous, Next, First, and Last are links. `onChange` receives the page alone from every control (DEC-3), so it does not tell a link, which navigates, from a dot or the Page input, which do not. A page-size choice calls `onPageSizeChange(size)` and then `onChange(1)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | DEC-2; DEC-3; current tests                                                                              |
 | FR19 | Button replaces the element of a control that stops or starts being a link (`component:Button` FR11): a link that becomes unavailable, at a boundary or while `isDisabled`, is a disabled button, and that button is a link when the control is available again. When the element that leaves holds focus, Pagination moves the focus to the element that replaces it in the same change, through Core's shared owner of that replacement (`architecture:react-component-runtime` INV16). The focus indicator follows the last input: it shows after a key press and not after a pointer press (`architecture:interaction-modality` INV1). The control then holds focus as a button control does (FR13; `spec:AST-085` FR4, FR7). Pagination moves no focus for a control that did not hold it, and none when another element holds focus after the change.                                                                                                                                                                                                                                              | `spec:AST-085` FR4, FR7; `component:Button` FR11; current source and tests                               |
+| FR20 | The control row carries `pagination-list` with `data-variant` and `data-size`. Each Button control in it (page numbers, previous and next, first and last) carries `pagination-item`, and the current page's reflects `data-active="active"`; an ellipsis carries `pagination-ellipsis`. A theme styles the row as one joined strip (its border, radius and shadow, a border between cells, the current cell's fill and a cell's hover) through these targets, apart from other Buttons (DEC-4). With no theme rule, Pagination looks as before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Current source and `Pagination.targets.test.tsx`                                                         |
 
 ### Allowed variation
 
@@ -188,20 +190,21 @@ Consumer migration instructions belong in consumer docs and release notes.
 
 ## Design relationships
 
-| Anatomy or state      | Design requirement                                                 | Representation authority       | Hierarchy role | Component contract |
-| --------------------- | ------------------------------------------------------------------ | ------------------------------ | -------------- | ------------------ |
-| Pagination            | Groups the page-size and paging controls in a navigation landmark. | Current source and public docs | Supporting     | FR1, FR2           |
-| Page-size selector    | Lets people choose the number of items shown per page.             | `component:Selector`           | Supporting     | FR3, FR11          |
-| First/last buttons    | Jump directly to the first or last known page.                     | `component:Button`             | Supporting     | FR3, FR5, FR12     |
-| Previous/next buttons | Move backward or forward through pages.                            | `component:Button`             | Prominent      | FR3, FR5, FR12     |
-| Page number button    | Selects one page directly in the numbered presentation.            | `component:Button`             | Prominent      | FR3, FR7           |
-| Ellipsis              | Indicates an omitted span of page numbers.                         | Current source and public docs | Supporting     | FR4, FR7           |
-| Count readout         | Presents the visible item range and total.                         | `component:Text`               | Prominent      | FR3, FR8           |
-| Compact readout       | Presents the current and total page counts.                        | `component:Text`               | Prominent      | FR3, FR8           |
-| Dot                   | Presents and selects one page in the dot presentation.             | Current source and public docs | Prominent      | FR2, FR9           |
-| Page input label      | Names the editable page field visually.                            | Current source and public docs | Supporting     | FR2, FR10          |
-| Page input            | Accepts a direct page-number entry.                                | `component:NumberInput`        | Prominent      | FR3, FR10          |
-| Page input total      | Presents the known total after the editable page field.            | Current source and public docs | Supporting     | FR2, FR10          |
+| Anatomy or state      | Design requirement                                                   | Representation authority       | Hierarchy role | Component contract |
+| --------------------- | -------------------------------------------------------------------- | ------------------------------ | -------------- | ------------------ |
+| Pagination            | Groups the page-size and paging controls in a navigation landmark.   | Current source and public docs | Supporting     | FR1, FR2           |
+| Control row           | Lays out the paging controls in one row a theme can draw as a strip. | Current source and public docs | Supporting     | FR20               |
+| Page-size selector    | Lets people choose the number of items shown per page.               | `component:Selector`           | Supporting     | FR3, FR11          |
+| First/last buttons    | Jump directly to the first or last known page.                       | `component:Button`             | Supporting     | FR3, FR5, FR12     |
+| Previous/next buttons | Move backward or forward through pages.                              | `component:Button`             | Prominent      | FR3, FR5, FR12     |
+| Page number button    | Selects one page directly in the numbered presentation.              | `component:Button`             | Prominent      | FR3, FR7           |
+| Ellipsis              | Indicates an omitted span of page numbers.                           | Current source and public docs | Supporting     | FR4, FR7           |
+| Count readout         | Presents the visible item range and total.                           | `component:Text`               | Prominent      | FR3, FR8           |
+| Compact readout       | Presents the current and total page counts.                          | `component:Text`               | Prominent      | FR3, FR8           |
+| Dot                   | Presents and selects one page in the dot presentation.               | Current source and public docs | Prominent      | FR2, FR9           |
+| Page input label      | Names the editable page field visually.                              | Current source and public docs | Supporting     | FR2, FR10          |
+| Page input            | Accepts a direct page-number entry.                                  | `component:NumberInput`        | Prominent      | FR3, FR10          |
+| Page input total      | Presents the known total after the editable page field.              | Current source and public docs | Supporting     | FR2, FR10          |
 
 The three Button rows are separate stable controls with different conditions and
 jobs; they do not create Pagination-owned Button targets. Presentation values,
@@ -215,23 +218,14 @@ not anatomy entries.
 ```json
 {
   "Pagination": {"target": "pagination"},
+  "Control row": {"target": "pagination-list"},
   "Page-size selector": {
     "delegatesTo": {"owner": "component:Selector", "target": "selector"}
   },
-  "First/last buttons": {
-    "delegatesTo": {"owner": "component:Button", "target": "button"}
-  },
-  "Previous/next buttons": {
-    "delegatesTo": {"owner": "component:Button", "target": "button"}
-  },
-  "Page number button": {
-    "delegatesTo": {"owner": "component:Button", "target": "button"}
-  },
-  "Ellipsis": {
-    "none": {
-      "reason": "unsettled: no current public target is applied to the Pagination-rendered ellipsis"
-    }
-  },
+  "First/last buttons": {"target": "pagination-item"},
+  "Previous/next buttons": {"target": "pagination-item"},
+  "Page number button": {"target": "pagination-item"},
+  "Ellipsis": {"target": "pagination-ellipsis"},
   "Count readout": {
     "delegatesTo": {"owner": "component:Text", "target": "text"}
   },
@@ -247,9 +241,10 @@ not anatomy entries.
 }
 ```
 
-The four local targets are current public seams. Delegated controls retain their
-component owners. Ellipsis has no current target; that factual `none` disposition
-does not decide whether it should remain unreachable.
+The seven local targets are current public seams. The Button controls carry
+`pagination-item` beside Button's own `button` target, so Button keeps their
+control behavior and anatomy, and a theme reaches them as Pagination's cells
+(FR20). The other delegated controls retain their component owners.
 
 ## Family and system relationships
 
@@ -348,12 +343,25 @@ type then depends on the variant and on `pageSizeOptions`.
 Rejected: a second argument that names the control, because a handler with its
 own second parameter stops compiling.
 
+### DEC-4 — The control row and its cells are Pagination's own targets
+
+**Reference:** `component:Pagination/DEC-4`
+**Decider:** `josephfarina`, `2026-11-16`
+
+A theme draws the controls as one joined strip, as some design systems do: the
+row has the border, radius and shadow, cells are separated by a border, and
+the current cell is filled. Button's own target reaches every Button, so the
+row (`pagination-list`), its Button cells (`pagination-item`) and the ellipsis
+(`pagination-ellipsis`) are Pagination's targets. `data-active` names the
+current page's cell, as it names the current dot on `pagination-dot`, and the
+row reflects `data-variant` and `data-size` as the root does. Each attribute is
+public because a theme selects on it (`architecture:public-component-api`
+DEC-2).
+
 ## Open questions
 
 - **OQ1 — Which focused tests should pin placement and reflected properties for
   the four local Pagination targets?** (`checkable`)
-- **OQ2 — Should Ellipsis gain a stable public theming target?** (`human-api`)
-  Its current lack of reachability does not decide the answer.
 
 ## Content boundary
 
