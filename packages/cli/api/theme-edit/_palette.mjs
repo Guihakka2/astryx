@@ -42,6 +42,10 @@ import {
   perceptualDelta,
 } from '../theme/palette/generate/generator.mjs';
 import {themePaletteGenerate} from '../theme/palette/generate/generate.mjs';
+import {
+  newerRecipe,
+  newerRecipeRefusal,
+} from '../theme/palette/generate/newer-recipe.mjs';
 /**
  * How the page-wide tokens a theme's own source sets are read: given by
  * _settings (which imports this module) when it loads.
@@ -2007,6 +2011,10 @@ export function syncPaletteRefs(cwd, slug, source, pal) {
  * @returns {Candidate}
  */
 function generate(config, file = 'palette.config.json') {
+  const newer = newerRecipe(config?.recipe);
+  if (newer) {
+    throw newerRecipeRefusal({recipe: newer, file, by: 'the theme editor'});
+  }
   try {
     return generateTonalPalette(config);
   } catch (e) {
