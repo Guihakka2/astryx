@@ -1658,7 +1658,6 @@ try {
         localFiles.push(target);
       } else if (
         target &&
-        raw.startsWith('.') &&
         !target.includes(NODE_MODULES) &&
         !isLocal(target) &&
         !outsideFiles.includes(target)
