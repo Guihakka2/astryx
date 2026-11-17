@@ -8,7 +8,11 @@
 
 import {readFileSync} from 'node:fs';
 import * as path from 'node:path';
-import {coreContentDir, realDir} from '../../foundation/fs/paths.mjs';
+import {
+  coreContentDir,
+  installedProjectCoreDir,
+  realDir,
+} from '../../foundation/fs/paths.mjs';
 import {withListingCache} from '../../foundation/fs/listing-cache.mjs';
 import {persistedGather} from '../../foundation/fs/gather-cache.mjs';
 import {
@@ -21,7 +25,7 @@ import {loadBlockPicker} from '../build/_adapter.mjs';
 import {CORELESS_DOMAINS} from './_query.mjs';
 import {gatherComponents} from './_gather-components.mjs';
 import {gatherHooks} from './_gather-hooks.mjs';
-import {gatherDocs} from './_gather-docs.mjs';
+import {gatherDocs, SEARCHABLE_EXPERIMENTAL_GUIDES} from './_gather-docs.mjs';
 import {
   derivedFromSource,
   gatherTemplates,
@@ -125,13 +129,12 @@ async function gatherDomains(options) {
       coreSkipped,
       coreSkippedCode,
     };
-    fromStore.set(result, {pm: found.pm, domains: DOMAINS.filter(wants)});
-    return result;
+    const visible = shareGuidesFor(result, cwd);
+    fromStore.set(visible, {pm: found.pm, domains: DOMAINS.filter(wants)});
+    return visible;
   }
   const [components, hooks, docTopics, templates, themes] = await Promise.all([
-    wants('component')
-      ? gatherComponents(coreDir, cwd)
-      : [],
+    wants('component') ? gatherComponents(coreDir, cwd) : [],
     wants('hook') ? gatherHooks(coreDir) : [],
     wants('doc') ? gatherDocs(cwd) : [],
     wants('template') ? gatherTemplates(cwd) : [],
@@ -142,14 +145,49 @@ async function gatherDomains(options) {
   // Outside a project a theme cannot be added to an app, so its command forks
   // the source instead (spec AST-081 FR3).
   const outside = themes.length > 0 && isOutsideProject(cwd);
+  return shareGuidesFor(
+    {
+      all,
+      components,
+      searchedComponents: wants('component'),
+      outside,
+      coreSkipped,
+      coreSkippedCode,
+    },
+    cwd,
+  );
+}
+
+/**
+ * The gathered catalog without the experimental shareable-page guides.
+ * @template {{all: Candidate[]}} T
+ * @param {T} gathered
+ * @returns {T}
+ */
+export function withoutShareGuides(gathered) {
   return {
-    all,
-    components,
-    searchedComponents: wants('component'),
-    outside,
-    coreSkipped,
-    coreSkippedCode,
+    ...gathered,
+    all: gathered.all.filter(
+      c =>
+        !(
+          c.domain === 'doc' &&
+          SEARCHABLE_EXPERIMENTAL_GUIDES.has(String(c._topic))
+        ),
+    ),
   };
+}
+
+/**
+ * The gathered catalog as a folder sees it: the shareable-page guides answer
+ * only in a project that depends on Astryx Core (spec:AST-017 FR27), so a
+ * folder without Core gathers as if they were absent.
+ * @template {{all: Candidate[]}} T
+ * @param {T} gathered
+ * @param {string} cwd
+ * @returns {T}
+ */
+function shareGuidesFor(gathered, cwd) {
+  return installedProjectCoreDir(cwd) ? gathered : withoutShareGuides(gathered);
 }
 
 /**

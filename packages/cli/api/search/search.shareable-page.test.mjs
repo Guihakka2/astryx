@@ -17,6 +17,8 @@ import {
   removeLinkedFixture,
 } from '../../test-utils/linked-fixture.mjs';
 import {SEARCHABLE_EXPERIMENTAL_GUIDES as GUIDES} from './_gather-docs.mjs';
+import {search} from './search.mjs';
+import {exportSearchIndex, rankSearchIndex} from './search-index.mjs';
 
 /** @type {string} */
 let tmp;
@@ -82,6 +84,24 @@ describe('search and the shareable-page guides', () => {
     async query => {
       expect((await docs(query, plainApp)).filter(isGuide)).toEqual([]);
     },
+  );
+
+  it.each(['plain', 'astryx'])(
+    'in a %s folder, an exported index ranks "single file" as search() does',
+    async kind => {
+      const cwd = kind === 'plain' ? plainApp : astryxApp;
+      const index = JSON.parse(JSON.stringify(await exportSearchIndex({cwd})));
+      const expected = JSON.parse(
+        JSON.stringify(await search('single file', {cwd, limit: 50})),
+      );
+      const actual = JSON.parse(
+        JSON.stringify(
+          await rankSearchIndex('single file', index, {limit: 50}),
+        ),
+      );
+      expect(actual).toEqual(expected);
+    },
+    120_000,
   );
 
   it('every other experimental doc stays out', async () => {

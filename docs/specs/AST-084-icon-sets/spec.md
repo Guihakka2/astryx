@@ -155,7 +155,8 @@ icon, and the CLI verifies it, writes the files, and checks the set.
   `--type icon-set` and ignores `icon-set` catalog items and their fields
   exactly as it does any unknown kind or field. Where icon features are on,
   `icon-set` is a discover kind (FR17). `astryx search` never reads icon
-  sets, whether icon features are on or off, and returns no experimental doc.
+  sets, whether icon features are on or off, and returns no experimental doc
+  other than the shareable-page guides `spec:AST-017/FR27` names.
   Where icon features are off, no stable doc names an experimental route, an
   icon set, or an icon definition, and a stable docs
   node's previous and next links skip experimental neighbors; the one stable
@@ -385,7 +386,8 @@ icon use <main> [--backup <set>]...` writes it: with no `--backup` it writes
   the same definition: a set draws one icon for each definition, so they
   would draw the same icon.
 - **FR11 — Search stays stable.** `astryx search` has no icon domain and no
-  `--type icon`, and returns no experimental doc, with or without the opt-in.
+  `--type icon`, and returns no experimental doc other than the
+  shareable-page guides `spec:AST-017/FR27` names, with or without the opt-in.
   Icons join it only at promotion.
 - **FR12 — The theme map.** A set exports the map `themeMap` names: one entry
   per built-in definition in `map`, each its icon's artwork, so a theme sets
@@ -733,7 +735,8 @@ message}`) names each template or namespace doc that sets `stability`, and
   `IconSetDoc`, and every schema field and enum value, accepts
   `stability: 'experimental'`: help shows a marked command as
   `[experimental]`, stable tables leave out a marked field or value, search
-  leaves out a marked doc, and Doctor's doc counts leave marked docs out. A
+  leaves out a marked doc (apart from `spec:AST-017/FR27`'s shareable-page
+  guides), and Doctor's doc counts leave marked docs out. A
   namespace's `source.packages: 'all'` adopts a doc group from every package
   only on a CLI namespace marked experimental (the icon definitions); DEC-7
   owns that exception to `spec:AST-046/FR2`.

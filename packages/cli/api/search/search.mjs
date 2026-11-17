@@ -23,15 +23,17 @@ import {
   runWithDocPackageManager,
 } from '../../foundation/env/package-manager.mjs';
 import {withListingCache} from '../../foundation/fs/listing-cache.mjs';
-import {gatherCandidatesReused, loadSearchData} from './_adapter.mjs';
+import {
+  gatherCandidatesReused,
+  loadSearchData,
+  withoutShareGuides,
+} from './_adapter.mjs';
 import {rankLexical} from './_lexical.mjs';
 import {searchView} from './_named-keywords.mjs';
 import {checkSearchArgs} from './_result.mjs';
 import {runTree} from '../../foundation/route/route.mjs';
 import {SEARCH_TREE} from './tree.mjs';
 import {linkSearchResponse} from '../component/_adapter.mjs';
-import {SEARCHABLE_EXPERIMENTAL_GUIDES} from './_gather-docs.mjs';
-import {installedProjectCoreDir} from '../../foundation/fs/paths.mjs';
 
 // The domains a search covers (the command handler lists them), and what
 // build reads from search: its word vocabulary, the components a search
@@ -95,34 +97,6 @@ async function searchRead(query, options) {
 }
 
 /**
- * The gathered catalog without the experimental shareable-page guides.
- * @template {{all: any[]}} T
- * @param {T} gathered
- * @returns {T}
- */
-function withoutShareGuides(gathered) {
-  return {
-    ...gathered,
-    all: gathered.all.filter(
-      c => !(c.domain === 'doc' && SEARCHABLE_EXPERIMENTAL_GUIDES.has(c._topic)),
-    ),
-  };
-}
-
-/**
- * The shareable-page guides answer only in a project that depends on Astryx
- * Core (spec:AST-017 FR27): they share an Astryx page, so a search anywhere
- * else answers without them.
- * @template {{all: any[]}} T
- * @param {T} gathered
- * @param {string} cwd
- * @returns {T}
- */
-function shareGuidesInAstryxProjects(gathered, cwd) {
-  return installedProjectCoreDir(cwd) ? gathered : withoutShareGuides(gathered);
-}
-
-/**
  * The other declaring domain, whose names a search for one `type` still reads.
  * @type {Record<string, string>}
  */
@@ -135,10 +109,7 @@ const NAMING_DOMAIN = {component: 'hook', hook: 'component'};
  * @param {{cwd?: string, type?: string}} options
  */
 async function searchCatalog(options) {
-  const gathered = shareGuidesInAstryxProjects(
-    await gatherCandidatesReused(options),
-    options.cwd ?? process.cwd(),
-  );
+  const gathered = await gatherCandidatesReused(options);
   const other = options.type == null ? null : NAMING_DOMAIN[options.type];
   return searchView(
     gathered,
@@ -214,7 +185,8 @@ async function searchCoreRead(query, options) {
         withoutNotReady(
           options.ownKeywords
             ? await searchCatalog(options)
-            : withoutShareGuides(await gatherCandidatesReused(options)),
+            : // build ranks without the shareable-page guides
+              withoutShareGuides(await gatherCandidatesReused(options)),
           options.readyTemplatesOnly === true,
         ),
       ),
