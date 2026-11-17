@@ -2,7 +2,15 @@
 
 Core UI components, theme system, and utilities for the Astryx design system. For project setup, see [Quick Start](#quick-start) below.
 
-> **Building with an AI agent?** Add the CLI, then run `init`:
+> **Building with an AI agent?** Ask the Astryx CLI before you write code. It runs without installing anything:
+>
+> ```bash
+> npx @astryxdesign/cli build "<what you are building>"   # the template, blocks and components to start from
+> npx @astryxdesign/cli component <Name>                  # one component's props, variants and examples
+> npx @astryxdesign/cli doctor                            # checks the setup and the code you wrote
+> ```
+>
+> The `.doc.mjs` files in this package are only part of what the CLI knows: it also has page templates, blocks and checks that no source file shows. To keep the CLI in the project, install it at Core's version, then run `init`:
 >
 > ```bash
 > npm install -D -E @astryxdesign/cli@<core version>   # or: pnpm add -D -E / yarn add -D -E / bun add -d --exact
@@ -11,7 +19,7 @@ Core UI components, theme system, and utilities for the Astryx design system. Fo
 >
 > Use the version of `@astryxdesign/core` you have. Keep `-E` when `package.json` pins Core exactly, as the starters do; leave it out when Core has a `^` or `~` range.
 >
-> `init` writes the Astryx component index into your `AGENTS.md`/`CLAUDE.md` so your agent discovers components, templates, and design tokens instead of guessing. Need a single command without installing? The same scoped command works: `npx @astryxdesign/cli <cmd>`. Always use the scoped name: the unscoped `astryx` resolves to an unrelated npm package until `@astryxdesign/cli` is a dependency. See [Astryx CLI](#astryx-cli).
+> `init` writes the Astryx component index into your `AGENTS.md`/`CLAUDE.md` so your agent discovers components, templates, and design tokens instead of guessing. Always use the scoped name: the unscoped `astryx` resolves to an unrelated npm package until `@astryxdesign/cli` is a dependency. See [Astryx CLI](#astryx-cli).
 
 ## Component Docs
 
