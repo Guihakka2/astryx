@@ -89,6 +89,9 @@ export const derivedVarRegistry: Record<string, DerivedVarEntry[]> = {
     {property: 'borderRadius', vars: ['--_segmented-control-radius']},
     {property: 'padding', vars: ['--_segmented-control-padding']},
   ],
+  // A pinned column replays its row's fill from --table-row-overlay: a
+  // theme's row background reaches it through the same variable.
+  'table-row': [{property: 'backgroundColor', vars: ['--table-row-overlay']}],
   'text-area': [
     {
       property: 'paddingInline',
