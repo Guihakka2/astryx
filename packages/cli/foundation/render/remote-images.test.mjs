@@ -493,7 +493,7 @@ describe('a render with images from the web', () => {
       expect(renderedMarkupOf(page.html)).toContain(data);
       const script = page.html.slice(page.html.lastIndexOf('<script>'));
       expect(script).not.toContain('https://example.com/bg.png');
-      expect(script).toContain(`url(${data})`);
+      expect(script).toContain(`url(${data}#)`);
     } finally {
       removeLinkedFixture(dir);
     }
@@ -743,6 +743,104 @@ describe('a render with images from the web', () => {
     }
   }, 120_000);
 
+  it('keeps an image drawn later whose address the code extends, as a data URI with an empty fragment', async () => {
+    const dir = makeLinkedFixture('astryx-render-extend-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const hero = 'https://cdn.example.com/hero.png';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return <main><button onClick={() => setOpen(true)}>Show</button>{open && <img src={`${hero}?w=640`} alt="" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch} = fetchFrom({'https://cdn.example.com/hero.png': png()});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      const data = `data:image/png;base64,${PNG.toString('base64')}`;
+      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      // `${hero}?w=640` then reads `data:…#?w=640`: the query joins the
+      // fragment, which a data: URL ignores.
+      expect(script).toContain(`"${data}#"`);
+      expect(script).not.toContain('https://cdn.example.com/hero.png');
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('reads a srcSet address that holds commas whole, and leaves a srcSet it carried nothing from as written', async () => {
+    const dir = makeLinkedFixture('astryx-render-srcset-commas-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return (',
+          '    <main>',
+          '      <button onClick={() => setOpen(true)}>Show</button>',
+          '      {open && <img srcSet="https://img.example.com/upload/c_fill,w_400/a.png 1x, https://img.example.com/upload/c_fill,w_800/a.png 2x" alt="" />}',
+          '      {open && <img srcSet="https://offline.example.com/b.png 1x, https://offline.example.com/b@2x.png 2x" alt="" />}',
+          '    </main>',
+          '  );',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({
+        'https://img.example.com/upload/c_fill,w_400/a.png': png(),
+        'https://img.example.com/upload/c_fill,w_800/a.png': png(),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked.map(a => a.url)).toEqual(
+        expect.arrayContaining([
+          'https://img.example.com/upload/c_fill,w_400/a.png',
+          'https://img.example.com/upload/c_fill,w_800/a.png',
+        ]),
+      );
+      const data = `data:image/png;base64,${PNG.toString('base64')}`;
+      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      expect(script).toContain(`${data} 1x, ${data} 2x`);
+      expect(script).toContain(
+        'https://offline.example.com/b.png 1x, https://offline.example.com/b@2x.png 2x',
+      );
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('asks for no src of an element that shows no image, such as an iframe or a video', async () => {
+    const dir = makeLinkedFixture('astryx-render-iframe-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        'export default function Page() { return <main><iframe src="https://example.com/embed.png" title="x" /><video src="https://example.com/clip.png" /></main>; }\n',
+      );
+      const {fetch, asked} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked).toEqual([]);
+      expect(page.remoteImages).toBeUndefined();
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
   it('warns once for a first-paint image whose address has a query', async () => {
     const dir = makeLinkedFixture('astryx-render-query-', [
       'react',
@@ -912,8 +1010,10 @@ describe('a render with images from the web', () => {
       const srcOf = (/** @type {string} */ alt) =>
         doc.querySelector(`#${ROOT_ID} img[alt="${alt}"]`)?.getAttribute('src');
       const data = `data:image/png;base64,${PNG.toString('base64')}`;
-      expect(srcOf('Alex')).toBe(data);
-      expect(srcOf('Jo')).toBe(data);
+      // The script draws a carried address as its data: URI with an empty
+      // fragment, which a data: URL ignores.
+      expect(srcOf('Alex')).toBe(`${data}#`);
+      expect(srcOf('Jo')).toBe(`${data}#`);
       expect(srcOf('Cover')).toBe('https://example.com/not-really-an-image');
       expect(doc.querySelector(`#${ROOT_ID} a`)?.getAttribute('href')).toBe(
         'https://example.com/guide',

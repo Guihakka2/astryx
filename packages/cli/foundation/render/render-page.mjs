@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import {fork, spawnSync} from 'node:child_process';
 import {builtinModules} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {formatSrcset, parseSrcset} from './srcset.mjs';
 import postcss from 'postcss';
 import {
   assetDataUri,
@@ -956,15 +957,16 @@ function mapAssetRefs(text, kind, resolve, rewrites) {
       return uri ? ` ${attr}="${uri}"` : whole;
     })
     .replace(/\s(srcset)="([^"]*)"/gi, (whole, attr, set) => {
-      const parts = decodeAttr(set)
-        .split(',')
-        .map(part => {
-          const [ref, ...rest] = part.trim().split(/\s+/);
-          const uri = ref ? resolve(ref) : null;
-          return [uri ?? ref, ...rest].join(' ');
-        });
-      const rewritten = parts.join(', ');
-      if (rewritten !== decodeAttr(set)) rewrites?.set(decodeAttr(set), rewritten);
+      const written = decodeAttr(set);
+      let carried = false;
+      const candidates = parseSrcset(written).map(({url, descriptor}) => {
+        const uri = resolve(url);
+        if (uri) carried = true;
+        return {url: uri ?? url, descriptor};
+      });
+      if (!carried) return whole;
+      const rewritten = formatSrcset(candidates);
+      rewrites?.set(written, rewritten);
       return ` ${attr}="${rewritten.replace(/"/g, '&quot;')}"`;
     })
     .replace(/\sstyle="([^"]*)"/g, (whole, style) => {
@@ -1264,15 +1266,16 @@ export async function renderPage(entry, options = {}) {
     // A `srcSet` value the script sets becomes the same list with each
     // fetched candidate's data in place of its address.
     for (const value of /** @type {string[]} */ (message.remoteSrcsets ?? [])) {
-      const carried = value
-        .split(',')
-        .map(part => {
-          const [ref = '', ...rest] = part.trim().split(/\s+/);
-          const fetched = ref ? remote.results.get(ref) : undefined;
-          return [fetched && 'uri' in fetched ? fetched.uri : ref, ...rest].join(' ');
-        })
-        .join(', ');
-      if (carried !== value && !ctx.rewrites.has(value)) ctx.rewrites.set(value, carried);
+      let carried = false;
+      const candidates = parseSrcset(value).map(({url, descriptor}) => {
+        const fetched = remote.results.get(url);
+        if (fetched && 'uri' in fetched) {
+          carried = true;
+          return {url: fetched.uri, descriptor};
+        }
+        return {url, descriptor};
+      });
+      if (carried && !ctx.rewrites.has(value)) ctx.rewrites.set(value, formatSrcset(candidates));
     }
   }
   /** Built addresses named in a warning already. @type {Set<string>} */
@@ -1288,6 +1291,12 @@ export async function renderPage(entry, options = {}) {
   }
   // The script draws the page again with the paths the page wrote, so each
   // image the first paint shows from its carried data keeps showing.
+  // In the script, a carried https address becomes its data: URI with an
+  // empty fragment, which a data: URL ignores: code that extends the address
+  // (`${hero}?w=640`) then adds to the fragment, and still draws the image.
+  for (const [was, now] of ctx.rewrites) {
+    if (/^https:\/\/\S+$/i.test(was) && now.startsWith('data:') && !now.includes('#')) ctx.rewrites.set(was, `${now}#`);
+  }
   const drawn = script === null ? null : withCarriedPaths(script, ctx.rewrites);
   // The script draws what the markup does not show yet (a menu as it opens,
   // the next tab), so the rules every class name it holds needs stay too.

@@ -46,6 +46,7 @@ import {transformSync} from '@babel/core';
 import {LOAD_EXTENSIONS, existingFile, matchPath, pathsFor, resolvePath} from './ts-paths.mjs';
 import {createJiti} from 'jiti';
 import {assetDataUri, isAssetPath} from './assets.mjs';
+import {parseSrcset} from './srcset.mjs';
 import {SINGLE_COPY, isServedPackage, packageOf, resolveServed} from './served-packages.mjs';
 import {findNodeModulesPackage} from '../fs/paths.mjs';
 import {importSpecifiers, moduleImports} from './embedded-imports.mjs';
@@ -141,10 +142,7 @@ function noteRemoteLiteral(value, why) {
  * @returns {string[]}
  */
 function srcsetCandidates(value) {
-  return value
-    .split(',')
-    .map(part => part.trim().split(/\s+/)[0] ?? '')
-    .filter(Boolean);
+  return parseSrcset(value).map(candidate => candidate.url);
 }
 /** https image addresses the page builds in code where an image goes, which a render cannot carry. @type {{text: string, file: string, line: number}[]} */
 const builtRemote = [];
@@ -752,7 +750,8 @@ const LINK_ATTR = /^(href|xlinkHref)$/i;
  * wrap it (`a ? x : y`, `x ?? y`, `x as string`): the key of the object
  * property it is the value of, or the JSX attribute it is in.
  * @param {any} p a path to the value
- * @returns {{name: string, jsx: boolean} | null}
+ * @returns {{name: string, jsx: boolean, element?: string | null} | null}
+ *   `element`: the JSX element's name, for an attribute
  */
 function nameOfValue(p) {
   let at = p;
@@ -772,7 +771,12 @@ function nameOfValue(p) {
   if (!holder) return null;
   if (holder.isJSXAttribute() && holder.node.value === at.node) {
     const n = holder.node.name;
-    return {name: n.type === 'JSXNamespacedName' ? n.name.name : n.name, jsx: true};
+    const tag = holder.parentPath?.node?.name;
+    return {
+      name: n.type === 'JSXNamespacedName' ? n.name.name : n.name,
+      jsx: true,
+      element: tag?.type === 'JSXIdentifier' ? tag.name : null,
+    };
   }
   if (holder.isObjectProperty() && holder.node.value === at.node && !holder.node.computed) {
     const k = holder.node.key;
@@ -832,6 +836,18 @@ function imageLiteralKind(value, p) {
   // A link's address is where the reader goes, even when it names an image
   // file: the file keeps it as written.
   if ((named && LINK_ATTR.test(named.name)) || reachesLink(p)) return null;
+  // On an HTML element, an image's address goes where the markup pass reads
+  // one: `src` of an `<img>` or `<input>`, `srcset` of an `<img>` or
+  // `<source>`, `poster` of a `<video>`. A component's props are its own.
+  if (named?.jsx && named.element && /^[a-z]/.test(named.element) && SRC_ATTR.test(named.name)) {
+    const attr = named.name.toLowerCase();
+    const tag = named.element;
+    const image =
+      (attr === 'src' && (tag === 'img' || tag === 'input')) ||
+      (attr === 'srcset' && (tag === 'img' || tag === 'source')) ||
+      (attr === 'poster' && tag === 'video');
+    if (!image) return null;
+  }
   if (named && /^srcset$/i.test(named.name)) return 'srcset';
   try {
     if (IMAGE_PATH.test(new URL(value).pathname)) return 'path';
