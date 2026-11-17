@@ -101,9 +101,13 @@ export function registerExperimentalRender(group, program) {
           text(
             d.checks.roundTrip.exact
               ? `Round trip: --reverse gives back all ${d.checks.roundTrip.files} files exactly.`
-              : 'Round trip: not exact. Run --reverse and compare the files.',
+              : `Round trip: not exact: ${d.checks.roundTrip.differs.join(', ')} differ${d.checks.roundTrip.differs.length === 1 ? 's' : ''} from the files on disk.`,
           ),
-          text(`Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). Nothing else needs to go with it.`),
+          text(
+            d.checks.outside.length === 0
+              ? `Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). Nothing else needs to go with it.`
+              : `Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). When it opens, it loads ${d.checks.outside.join(', ')} from the network.`,
+          ),
           text(`Give it back: ${run} experimental render --reverse ${shellArg(d.output)}${restoreHere(d)}`),
         );
         return answered;

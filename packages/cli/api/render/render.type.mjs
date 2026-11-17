@@ -56,7 +56,7 @@
  * @property {number} data.scriptModules - How many modules the page's script holds (the page's own, its packages', React's).
  * @property {object} data.checks - Checks run on the written file.
  * @property {string[]} data.checks.outside - Every outside address the file's markup and stylesheets load when it opens; empty when it loads nothing from the network.
- * @property {{exact: boolean, files: number}} data.checks.roundTrip - Whether the embedded source gives back every carried file byte for byte, and how many files it carries.
+ * @property {{exact: boolean, files: number, differs: string[]}} data.checks.roundTrip - Whether the embedded source gives back every carried file byte for byte, how many files it carries, and the carried paths whose embedded copy differs from the file on disk or is missing on either side.
  */
 
 /**

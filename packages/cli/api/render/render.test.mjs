@@ -1104,6 +1104,15 @@ describe('render(): every write stays inside the current folder', () => {
     expect(byId(doc, 'q').children[0].text).toBe('Q');
     expect(r.data.warnings.map((/** @type {any} */ w) => w.code)).toContain('remote-asset');
     expect(r.data.files).toEqual(expect.arrayContaining(['a.png', 'b.png']));
+    // The check names what the written file loads; it never stops the write.
+    expect(r.data.checks.outside).toEqual(['https://example.com/x.png']);
+    expect(r.data.checks.roundTrip).toEqual({exact: true, files: 3, differs: []});
+    const cli = await runCli(['experimental', 'render', 'styleattr/page.tsx', '--out', 'styleattr/again.html'], {cwd: dir});
+    expect(cli.status).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'styleattr/again.html'))).toBe(true);
+    expect(cli.stdout).toContain('Offline: no. The file loads https://example.com/x.png.');
+    expect(cli.stdout).toContain('When it opens, it loads https://example.com/x.png from the network.');
+    expect(cli.stdout).not.toContain('Nothing else needs to go with it.');
   }, 60_000);
 
   it('carries a stylesheet pulled in by @import and gives it back, and says when one is missing', async () => {

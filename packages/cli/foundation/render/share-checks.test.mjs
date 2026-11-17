@@ -18,11 +18,26 @@ describe('outsideRequests', () => {
       '<script>fetch("https://api.example/e")</script></body></html>',
     ].join('');
     expect(outsideRequests(html, os.tmpdir())).toEqual([
+      'https://fonts.example/a.css',
+      '//cdn.example/b.png',
       'https://cdn.example/c.css',
       'https://img.example/d.png',
       'https://img.example/d2.png',
-      '//cdn.example/b.png',
-      'https://fonts.example/a.css',
+    ]);
+  });
+
+  it('reads tags as a browser does: a > inside a quoted value, spaces around =, and url() in a style attribute', () => {
+    const html = [
+      '<html><body>',
+      '<img alt="a > b" src = "https://img.example/q.png">',
+      "<div style=\"background:url('https://img.example/s.png')\">x</div>",
+      '<img title=\'x>y\' src=https://img.example/bare.png>',
+      '</body></html>',
+    ].join('');
+    expect(outsideRequests(html, os.tmpdir())).toEqual([
+      'https://img.example/q.png',
+      'https://img.example/s.png',
+      'https://img.example/bare.png',
     ]);
   });
 
@@ -50,12 +65,22 @@ describe('roundTrip', () => {
 
   it('is exact when every carried file comes back byte for byte, a page below the carry root included', () => {
     const {dir, carried, html} = page({'pages/page.tsx': 'export default () => null;\n', 'data.json': '{"a":1}\n'});
-    expect(roundTrip(html, path.join(dir, 'pages/page.tsx'), carried)).toEqual({exact: true, files: 2});
+    expect(roundTrip(html, path.join(dir, 'pages/page.tsx'), carried)).toEqual({exact: true, files: 2, differs: []});
   });
 
   it('is not exact when a carried file changed after the render', () => {
     const {dir, carried, html} = page({'page.tsx': 'export default () => null;\n'});
     fs.writeFileSync(path.join(dir, 'page.tsx'), 'export default () => 1;\n');
-    expect(roundTrip(html, path.join(dir, 'page.tsx'), carried)).toEqual({exact: false, files: 1});
+    expect(roundTrip(html, path.join(dir, 'page.tsx'), carried)).toEqual({exact: false, files: 1, differs: ['page.tsx']});
+  });
+
+  it('names a carried file missing on either side', () => {
+    const {dir, carried, html} = page({'page.tsx': 'export default () => null;\n', 'data.json': '{}\n'});
+    fs.rmSync(path.join(dir, 'data.json'));
+    expect(roundTrip(html, path.join(dir, 'page.tsx'), [...carried, 'extra.json'])).toEqual({
+      exact: false,
+      files: 2,
+      differs: ['data.json', 'extra.json'],
+    });
   });
 });
