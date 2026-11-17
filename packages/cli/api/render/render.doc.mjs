@@ -77,7 +77,7 @@ export const doc = {
     {
       type: 'render.page',
       description:
-        "The page and the HTML file written, its size, the local modules embedded, the stylesheets inlined, the class and image counts, the CSS size, the script's size and how many modules it holds, any warnings, and the checks run on the written file: every outside address it loads (none for a file that loads nothing from the network) and whether its embedded source gives back every carried file exactly, naming the files that differ.",
+        "The page and the HTML file written, its size, the local modules embedded, the stylesheets inlined, the class and image counts, the CSS size, the markup's size (its inlined images included), the embedded source's size, the script's size and how many modules it holds, any warnings, and the checks run on the written file: every outside address it loads (none for a file that loads nothing from the network) and whether its embedded source gives back every carried file exactly, naming the files that differ.",
     },
     {
       type: 'render.reverse',

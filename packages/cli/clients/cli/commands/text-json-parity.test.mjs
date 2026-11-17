@@ -533,9 +533,7 @@ const CASES = [
         'export default function Page() { return <h1>Hello</h1>; }\n',
       );
     },
-    jsonFieldAllowlist: [
-      'warnings — listed under Warnings when present',
-    ],
+    jsonFieldAllowlist: ['warnings — listed under Warnings when present'],
     textBlockAllowlist: [
       "The file's markup and stylesheets load nothing from the network. — the text form of an empty checks.outside",
     ],

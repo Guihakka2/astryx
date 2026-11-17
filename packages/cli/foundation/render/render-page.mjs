@@ -1472,7 +1472,6 @@ export async function renderPage(entry, options = {}) {
   const body = script ? `<div id="${ROOT_ID}">${markup}</div>` : markup;
   const scriptTag = drawn ? `<script>${drawn}</script>\n` : '';
   let html;
-  /** The embedded source block. */
   let block;
   if (options.output) {
     // The charset and generator metas come first: a browser reads the
