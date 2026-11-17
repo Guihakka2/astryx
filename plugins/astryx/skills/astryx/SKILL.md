@@ -4,8 +4,9 @@ description: "Astryx, a design system and UI library, is available on this compu
 ---
 
 <!-- ASTRYX:START -->
-<!-- astryx-managed sha256:661deece21b17ef3a3bc4ba71fea738847d521fdbb806a45420db3d758952f18 -->
+<!-- astryx-managed sha256:760a5d70cd2df4b5e108fa48d56dafd35d44a8e72e39f4369ca66ec064fe74f5 -->
 Astryx, a design system and UI library, is available on this computer.
+Inside a project that has its own Astryx text (an `astryx-project` skill, or an Astryx block in AGENTS.md or CLAUDE.md), follow that text: it knows the project's version and setup.
 Use it when you build or change UI, pick components, or style or theme an app.
 Its docs, components, templates, and themes are all reachable through `astryx`. To make a page, run `astryx build "<what the page is for>"` first, as the WORKFLOW below says. Start with `astryx search '<what you need>'` for anything else.
 Then read `astryx component <Name>` or `astryx docs <topic>`, not the package's files.
