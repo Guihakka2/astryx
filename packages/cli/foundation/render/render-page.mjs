@@ -1245,6 +1245,10 @@ export async function renderPage(entry, options = {}) {
         if (!ctx.rewrites.has(url)) ctx.rewrites.set(url, fetched.uri);
         continue;
       }
+      // A server that answered with something that is not an image (an API,
+      // a page) names no image the file could carry: the result lists it,
+      // with no warning.
+      if (fetched.answered) continue;
       const key = `remote:${url}`;
       if (ctx.counted.has(key)) continue;
       ctx.counted.add(key);

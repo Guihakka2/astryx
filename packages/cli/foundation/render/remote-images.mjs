@@ -124,8 +124,11 @@ export function imageRequest(href, init = {}, transport = https) {
 }
 
 /**
- * @typedef {{uri: string} | {reason: string}} RemoteImage
- *   the data: URI the file carries, or why the image was not fetched
+ * @typedef {{uri: string} | {reason: string, answered?: boolean}} RemoteImage
+ *   the data: URI the file carries, or why the image was not fetched;
+ *   `answered` when the server answered with something that is not the
+ *   image (an error status, another type, a redirect the render does not
+ *   follow)
  */
 
 /**
@@ -258,15 +261,21 @@ export function remoteImages({
     if (response.ok) answered++;
     const stop = () => response.body?.cancel().catch(() => {});
     if (response.badLocation) {
-      return {reason: 'it moved to an address that is not valid'};
+      return {
+        reason: 'it moved to an address that is not valid',
+        answered: true,
+      };
     }
     if (response.url && !response.url.startsWith('https:')) {
       stop();
-      return {reason: 'it moved to an address that is not https'};
+      return {
+        reason: 'it moved to an address that is not https',
+        answered: true,
+      };
     }
     if (!response.ok) {
       stop();
-      return {reason: `the server answered ${response.status}`};
+      return {reason: `the server answered ${response.status}`, answered: true};
     }
     const type = (response.headers.get('content-type') ?? '')
       .split(';')[0]
@@ -274,7 +283,7 @@ export function remoteImages({
       .toLowerCase();
     if (!type.startsWith('image/')) {
       stop();
-      return {reason: 'not an image'};
+      return {reason: 'not an image', answered: true};
     }
     if (Number(response.headers.get('content-length')) > maxBytes) {
       stop();
@@ -297,7 +306,7 @@ export function remoteImages({
     }
     const bytes = Buffer.concat(chunks);
     const image = imageTypeOf(bytes);
-    if (!image) return {reason: 'not an image'};
+    if (!image) return {reason: 'not an image', answered: true};
     return {uri: `data:${image};base64,${bytes.toString('base64')}`};
   }
 

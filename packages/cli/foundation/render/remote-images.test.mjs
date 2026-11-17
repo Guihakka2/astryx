@@ -487,6 +487,78 @@ describe('a render with images from the web', () => {
     }
   }, 120_000);
 
+  it('requests an API address an image-named property holds, and keeps it with no warning when the answer is not an image', async () => {
+    const dir = makeLinkedFixture('astryx-render-api-', ['react', 'react-dom']);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const config = {imageUploadUrl: 'https://api.example.com/v1/upload'};",
+          'export default function Page() {',
+          '  const [sent, setSent] = useState(false);',
+          "  return <main><button onClick={() => fetch(config.imageUploadUrl, {method: 'POST'}).then(() => setSent(true))}>Upload</button>{sent && <p>Sent</p>}</main>;",
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch} = fetchFrom({
+        'https://api.example.com/v1/upload': respond('{"ok":true}', {
+          headers: {'content-type': 'application/json'},
+        }),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(page.warnings.filter(w => w.code === 'remote-asset')).toEqual([]);
+      expect(page.remoteImages?.failed).toEqual([
+        {url: 'https://api.example.com/v1/upload', reason: 'not an image'},
+      ]);
+      expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
+        '"https://api.example.com/v1/upload"',
+      );
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it("never asks for a link's address, even when it names an image file", async () => {
+    const dir = makeLinkedFixture('astryx-render-link-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  return (',
+          '    <main>',
+          '      <a href="https://example.com/first.png">First</a>',
+          '      <button onClick={() => setOpen(true)}>More</button>',
+          '      {open && <a href="https://example.com/brochure.png">Brochure</a>}',
+          '    </main>',
+          '  );',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked).toEqual([]);
+      expect(renderedMarkupOf(page.html)).toContain(
+        'href="https://example.com/first.png"',
+      );
+      expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
+        '"https://example.com/brochure.png"',
+      );
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
   it('warns for an image the script draws later when its fetch fails', async () => {
     const dir = makeLinkedFixture('astryx-render-late-fail-', [
       'react',

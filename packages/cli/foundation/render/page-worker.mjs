@@ -700,6 +700,9 @@ function namesImage(name) {
 /** The attributes where JSX puts an image's address. */
 const SRC_ATTR = /^(src|srcset|poster)$/i;
 
+/** The attributes and properties where a page puts a link's address. */
+const LINK_ATTR = /^(href|xlinkHref)$/i;
+
 /**
  * The name a value is given, through the expressions that only choose or
  * wrap it (`a ? x : y`, `x ?? y`, `x as string`): the key of the object
@@ -746,12 +749,15 @@ function nameOfValue(p) {
  */
 function isImageLiteral(value, p) {
   if (!/^https:\/\//i.test(value)) return false;
+  const named = nameOfValue(p);
+  // A link's address is where the reader goes, even when it names an image
+  // file: the file keeps it as written.
+  if (named && LINK_ATTR.test(named.name)) return false;
   try {
     if (IMAGE_PATH.test(new URL(value).pathname)) return true;
   } catch {
     return false;
   }
-  const named = nameOfValue(p);
   return Boolean(named && (SRC_ATTR.test(named.name) || namesImage(named.name)));
 }
 
