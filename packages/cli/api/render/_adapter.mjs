@@ -41,6 +41,7 @@ import {isAssetBytes, isAssetPath} from '../../foundation/render/assets.mjs';
 import {createFileProtectionResolver} from '../../foundation/fs/file-protection.mjs';
 import {publishNewFile} from '../../foundation/fs/publish-file.mjs';
 import {reachableFiles, receivingAliases} from '../../foundation/render/embedded-imports.mjs';
+import {relativeSpecifierBetween} from '../../foundation/fs/relative-specifier.mjs';
 import {pathsHomeFor} from '../../foundation/render/ts-paths.mjs';
 import {isAstryxMarkup} from '../../foundation/render/html-reader.mjs';
 import {rebuildPage} from '../../foundation/render/rebuild.mjs';
@@ -976,16 +977,12 @@ export function reverseToFile({cwd, input, output, overwrite}) {
       // project reads: each restored file that makes the import (the page, a
       // file it reaches by a relative import, or another restored copy)
       // imports the copy by a relative path. Known once every file is placed.
-      const relativeImport = (/** @type {string} */ from, /** @type {string} */ to) => {
-        const spec = path.relative(path.dirname(from), to).split(path.sep).join('/').replace(/\.[cm]?[jt]sx?$/, '');
-        return spec.startsWith('.') ? spec : `./${spec}`;
-      };
       const restoredAt = (/** @type {string} */ q) =>
         q === source.files[0].path ? [target] : [placeFrom(q), ...(reached.get(q)?.aliased ?? [])].filter(file => placed.has(file));
       for (const {entry, importers, copy} of insteadFor) {
         entry.instead = [...new Set(importers.flatMap(restoredAt))]
           .sort()
-          .map(from => ({file: shown(cwd, from), import: relativeImport(from, copy)}));
+          .map(from => ({file: shown(cwd, from), import: relativeSpecifierBetween(from, copy)}));
       }
       unaliased.sort((a, b) => (a.spec < b.spec ? -1 : a.spec > b.spec ? 1 : 0));
       const byImport = (/** @type {{import: string}} */ a, /** @type {{import: string}} */ b) => (a.import < b.import ? -1 : a.import > b.import ? 1 : 0);
