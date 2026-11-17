@@ -12,6 +12,7 @@ export const docs = {
   name: 'render-pages',
   placement: {parent: 'namespace:experimental', slot: 'guides', order: 20},
   stability: 'experimental',
+  searchable: true,
   title: 'Pages as one HTML file',
   category: 'guide',
   keywords: [
@@ -21,7 +22,6 @@ export const docs = {
     'artifact',
     'share a page',
     'snapshot',
-    'embed',
     'sandboxed iframe',
     'reverse',
     'unrender',

@@ -28,7 +28,7 @@ import {loadBlockPicker} from '../build/_adapter.mjs';
 import {CORELESS_DOMAINS} from './_query.mjs';
 import {gatherComponents} from './_gather-components.mjs';
 import {gatherHooks} from './_gather-hooks.mjs';
-import {gatherDocs, SEARCHABLE_EXPERIMENTAL_GUIDES} from './_gather-docs.mjs';
+import {gatherDocs} from './_gather-docs.mjs';
 import {
   derivedFromSource,
   gatherTemplates,
@@ -170,13 +170,7 @@ async function gatherDomains(options) {
 export function withoutShareGuides(gathered) {
   return {
     ...gathered,
-    all: gathered.all.filter(
-      c =>
-        !(
-          c.domain === 'doc' &&
-          SEARCHABLE_EXPERIMENTAL_GUIDES.has(String(c._topic))
-        ),
-    ),
+    all: gathered.all.filter(c => c._experimentalGuide !== true),
   };
 }
 

@@ -16,9 +16,14 @@ import {
   makeLinkedFixture,
   removeLinkedFixture,
 } from '../../test-utils/linked-fixture.mjs';
-import {SEARCHABLE_EXPERIMENTAL_GUIDES as GUIDES} from './_gather-docs.mjs';
 import {search} from './search.mjs';
 import {exportSearchIndex, rankSearchIndex} from './search-index.mjs';
+
+/** The guides search returns while experimental (they set `searchable`). */
+const GUIDES = new Set([
+  'cli/experimental/share-a-page',
+  'cli/experimental/render-pages',
+]);
 
 /** @type {string} */
 let tmp;
@@ -116,6 +121,15 @@ describe('search and the shareable-page guides', () => {
     },
     120_000,
   );
+
+  it('a shareable-page guide answers as one entry, never by a section', async () => {
+    for (const query of ['share', 'single file', 'warnings', 'get it back']) {
+      for (const result of await docs(query, astryxApp)) {
+        if (!isGuide(result)) continue;
+        expect(result).not.toHaveProperty('section');
+      }
+    }
+  });
 
   it('every other experimental doc stays out', async () => {
     for (const query of ['icon set', 'theme editor', 'experimental', 'share']) {

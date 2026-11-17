@@ -496,6 +496,7 @@ function buildDocSchemas() {
       replaces: nonEmptyString.optional(),
       extends: nonEmptyString.optional(),
       tokenCategory: z.string().optional(),
+      searchable: z.literal(true).optional(),
     })
     .passthrough()
     .superRefine((doc, context) => {
@@ -855,6 +856,7 @@ function buildDocSchemas() {
     replaces: nonEmptyString.optional(),
     extends: nonEmptyString.optional(),
     tokenCategory: z.string().optional(),
+    searchable: z.literal(true).optional(),
   })
     .passthrough()
     .superRefine((doc, context) => {
