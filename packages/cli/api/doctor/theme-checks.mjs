@@ -2200,9 +2200,126 @@ export async function checkAppThemes(cwd) {
           },
   );
 
+  const pageCheck = oneModePageCheck(
+    state.projectDir,
+    resolved.find(theme => theme.slug === state.defaultSlug) ?? null,
+  );
+  if (pageCheck) checks.push(pageCheck);
+
   const migration = unmigratedCopyCheck(state.projectDir);
   if (migration) checks.push(migration);
   return checks;
+}
+
+/**
+ * A hex or rgb() color's lightness side: true for a light color, false for
+ * a dark one, null for a value this check cannot read.
+ * @param {string} value
+ * @returns {boolean | null}
+ */
+function lightSide(value) {
+  const v = value.trim().toLowerCase();
+  let rgb = null;
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})(?:[0-9a-f]{2})?$/.exec(v);
+  if (hex) {
+    const h =
+      hex[1].length === 3 ? [...hex[1]].map(c => c + c).join('') : hex[1];
+    rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  }
+  const fn = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(v);
+  if (fn) rgb = [fn[1], fn[2], fn[3]].map(Number);
+  if (!rgb) return null;
+  const [r, g, b] = rgb.map(c => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18;
+}
+
+/**
+ * The one mode a built theme's page color is drawn for, or null when its
+ * page takes a light and a dark color (or the value cannot be read).
+ * @param {string} css
+ * @returns {'light' | 'dark' | null}
+ */
+function oneModeOfPage(css) {
+  const value = /--color-background-body\s*:\s*([^;}]+)/.exec(css)?.[1];
+  if (!value) return null;
+  const pair = /^\s*light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)\s*$/.exec(
+    value,
+  );
+  const sides = (pair ? [pair[1], pair[2]] : [value]).map(lightSide);
+  if (sides.some(side => side == null)) return null;
+  if (sides.some(side => side !== sides[0])) return null;
+  return sides[0] ? 'light' : 'dark';
+}
+
+/**
+ * A default theme drawn for one mode, in an app whose page is painted by
+ * neither AppShell nor a body background: in the other OS mode the theme's
+ * text lands on the browser's own page color. Astryx never paints the host
+ * page, so the app must.
+ * @param {string} projectDir
+ * @param {ResolvedAppTheme | null} theme
+ * @returns {DoctorCheck | null}
+ */
+function oneModePageCheck(projectDir, theme) {
+  if (!theme?.stylesheetFile) return null;
+  let mode;
+  try {
+    mode = oneModeOfPage(readTextFile(theme.stylesheetFile));
+  } catch {
+    return null;
+  }
+  if (!mode) return null;
+  let painted = false;
+  for (const file of listProjectSourceFiles(projectDir, '', {
+    stylesheets: true,
+  })) {
+    let source;
+    try {
+      source = readTextFile(file);
+    } catch {
+      continue;
+    }
+    if (generatedThemeFile(source)) continue;
+    if (path.extname(file) === '.css') {
+      if (
+        /(?:^|[}\s,])(?:html|body|:root)\s*(?:,[^{]*)?\{[^}]*\bbackground(?:-color)?\s*:/i.test(
+          source,
+        )
+      ) {
+        painted = true;
+        break;
+      }
+      continue;
+    }
+    if (
+      source.includes('AppShell') &&
+      doctorRendersElement(file, {
+        sources: new Set(['@astryxdesign/core']),
+        name: 'AppShell',
+      })
+    ) {
+      painted = true;
+      break;
+    }
+  }
+  const other = mode === 'dark' ? 'light' : 'dark';
+  return painted
+    ? {
+        id: 'theme-page-color',
+        label: 'Page color for a one-mode theme',
+        status: 'pass',
+        message: `${theme.slug} is drawn for ${mode} mode, and the app paints its page (AppShell or a body background).`,
+      }
+    : {
+        id: 'theme-page-color',
+        label: 'Page color for a one-mode theme',
+        status: 'warn',
+        message: `${theme.slug} is drawn for ${mode} mode only, and nothing paints the app's page: no AppShell renders and no stylesheet gives the body a background. In ${other} OS mode its text sits on the browser's own page color.`,
+        fix: "Wrap the page in AppShell; if you can't, add `body { background: var(--color-background-body) }` to global CSS (the purity check flags any stylesheet, so prefer AppShell).",
+      };
 }
 
 /** @param {string} file */

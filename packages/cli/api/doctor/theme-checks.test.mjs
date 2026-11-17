@@ -2013,6 +2013,54 @@ describe('app-theme doctor checks', () => {
     expect(result.message).toContain('body');
   });
 
+  it('warns when a one-mode theme page is painted by neither AppShell nor a body background', async () => {
+    const {dir} = await fixture([
+      {
+        slug: 'ocean',
+        css: '[data-astryx-theme="ocean"] { --color-background-body: #101314; --color-text-primary: #e8f1f6; }\n',
+      },
+    ]);
+    const result = check(await checkAppThemes(dir), 'theme-page-color');
+    expect(result).toMatchObject({status: 'warn'});
+    expect(result.message).toContain('drawn for dark mode only');
+    expect(result.fix).toMatch(
+      /^Wrap the page in AppShell; if you can't, add `body \{ background: var\(--color-background-body\) \}` to global CSS/,
+    );
+  });
+
+  it('passes the one-mode page check when the app renders AppShell or paints the body', async () => {
+    const css =
+      '[data-astryx-theme="ocean"] { --color-background-body: #101314; }\n';
+    const shell = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(shell.dir, 'src/App.tsx'),
+      "import {AppShell} from '@astryxdesign/core';\nexport const App = () => <AppShell />;\n",
+    );
+    expect(
+      check(await checkAppThemes(shell.dir), 'theme-page-color'),
+    ).toMatchObject({status: 'pass'});
+
+    const body = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(body.dir, 'src/global.css'),
+      'body { background: var(--color-background-body); }\n',
+    );
+    expect(
+      check(await checkAppThemes(body.dir), 'theme-page-color'),
+    ).toMatchObject({status: 'pass'});
+  });
+
+  it('adds no page check for a theme with a light and a dark page', async () => {
+    const {dir} = await fixture([
+      {
+        slug: 'ocean',
+        css: '[data-astryx-theme="ocean"] { --color-background-body: light-dark(#f1f4f7, #111112); }\n',
+      },
+    ]);
+    const checks = await checkAppThemes(dir);
+    expect(checks.some(item => item.id === 'theme-page-color')).toBe(false);
+  });
+
   it('reports one information check when the CLI manages no themes', async () => {
     const dir = fs.mkdtempSync(path.join(REPO_ROOT, '.astryx-doctor-empty-'));
     dirs.push(dir);
