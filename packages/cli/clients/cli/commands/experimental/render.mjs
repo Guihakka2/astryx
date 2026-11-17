@@ -92,6 +92,18 @@ export function registerExperimentalRender(group, program) {
           ...(d.warnings.length > 0
             ? [section('Warnings'), list(d.warnings.map(w => w.message))]
             : []),
+          section('Checks'),
+          text(
+            d.checks.outside.length === 0
+              ? 'Offline: the file loads nothing from the network.'
+              : `Offline: no. The file loads ${d.checks.outside.join(', ')}.`,
+          ),
+          text(
+            d.checks.roundTrip.exact
+              ? `Round trip: --reverse gives back all ${d.checks.roundTrip.files} files exactly.`
+              : 'Round trip: not exact. Run --reverse and compare the files.',
+          ),
+          text(`Share this one file: ${path.resolve(d.output)} (${kb(d.bytes)}). Nothing else needs to go with it.`),
           text(`Give it back: ${run} experimental render --reverse ${shellArg(d.output)}${restoreHere(d)}`),
         );
         return answered;
