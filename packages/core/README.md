@@ -41,7 +41,7 @@ panel slots into common page patterns (dashboards, settings, forms, detail pages
 Wrap them in your own app chrome (`AppShell`, `TopNav`, `SideNav`) to add
 global navigation.
 
-Requires `@astryxdesign/cli` at Core's version (install it as the box at the top shows):
+Requires `@astryxdesign/cli` at Core's version: `npm install -D -E @astryxdesign/cli@<core version>` (leave out `-E` when Core has a `^` or `~` range).
 
 ```bash
 astryx template --list              # browse all page and block templates
