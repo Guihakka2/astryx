@@ -2,7 +2,14 @@
 
 'use client';
 
-import {Fragment, useCallback, useRef, useState, type SVGProps} from 'react';
+import {
+  Fragment,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type SVGProps,
+} from 'react';
 import * as stylex from '@stylexjs/stylex';
 
 import {AspectRatio} from '@astryxdesign/core/AspectRatio';
@@ -193,6 +200,16 @@ const LABEL_COLUMN = 80;
 const TAB_MAX_WIDTH = 164;
 
 /**
+ * Narrowest a document tab gets before the strip scrolls instead.
+ *
+ * Enough for the mark, a few characters and the close.
+ */
+const TAB_MIN_WIDTH = 96;
+
+/** The strip's inline padding, both sides: `paddingInline={2}` is 8px. */
+const TAB_STRIP_PADDING = 16;
+
+/**
  * Room the tab strip leaves for the rest of the header, in pixels.
  *
  * Covers the menu button ahead of the strip, the save note and Export button
@@ -218,6 +235,16 @@ const HIDE_INSPECTOR = '@media (max-width: 1099.98px)';
  * longer than being able to adjust it.
  */
 const HIDE_RAIL = '@media (max-width: 839.98px)';
+
+/**
+ * Header width below which the save note folds away.
+ *
+ * Below this width the strip cannot have one full tab next to the reserve
+ * that holds the note, so the note gives up its room. It is the least
+ * important thing in the bar: the tabs and Export are actions, and the note
+ * is only status.
+ */
+const FOLD_SAVE_NOTE = `@container editor-header (max-width: ${TAB_MIN_WIDTH + TAB_STRIP_PADDING + TAB_STRIP_RESERVE - 0.02}px)`;
 
 const PHOTO_LAYER_SRC = '/template-assets/moody-scene-vertical-1.png';
 
@@ -830,6 +857,7 @@ const styles = stylex.create({
   // a grip is left behind on a seam with nothing on the other side.
   foldsAtRail: {display: {default: null, [HIDE_RAIL]: 'none'}},
   foldsAtInspector: {display: {default: null, [HIDE_INSPECTOR]: 'none'}},
+  foldsAtSaveNote: {display: {default: null, [FOLD_SAVE_NOTE]: 'none'}},
   // A short rule, not a full-height one: the strip has no columns to divide,
   // it only needs the smallest mark that reads as "these are separate tabs".
   // A vertical Divider takes its height from the row unless given one, and a
@@ -861,7 +889,7 @@ const styles = stylex.create({
     // A floor, so a crowded strip scrolls instead of grinding every tab down
     // to an unreadable sliver. Enough for the mark, a few characters and the
     // close; past it the strip's own overflow takes over.
-    minWidth: 96,
+    minWidth: TAB_MIN_WIDTH,
   },
   // Item marks a selected row with --color-accent-muted, which this editor's
   // theme resolves to #262626 in dark — the exact colour of the header bar
@@ -1668,6 +1696,26 @@ export default function CanvasEditor() {
   const [selectedID, setSelectedID] = useState('headline');
   const [panel, setPanel] = useState('layers');
   const [zoom, setZoom] = useState('0.4');
+  // Open on the largest zoom step whose artboard fits the canvas, the way a
+  // design tool fits a document on open. On a phone 40% is wider than the
+  // screen; after the first fit, zoom is the user's to change.
+  const canvasRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas == null) return;
+    const {paddingInlineStart, paddingInlineEnd} = getComputedStyle(canvas);
+    const room =
+      canvas.clientWidth -
+      parseFloat(paddingInlineStart) -
+      parseFloat(paddingInlineEnd);
+    setZoom(current => {
+      if (FRAME.width * Number(current) <= room) return current;
+      const fitting = ZOOM_OPTIONS.filter(
+        option => FRAME.width * Number(option.value) <= room,
+      );
+      return (fitting.at(-1) ?? ZOOM_OPTIONS[0]).value;
+    });
+  }, []);
 
   // The picker is presentational here: a template has no upload endpoint to
   // post to, and swapping the artboard for a local object URL would leave the
@@ -1985,7 +2033,11 @@ export default function CanvasEditor() {
                     paddingInline={2}
                     paddingBlock={1}
                     isScrollable
-                    maxWidth={`calc(100cqw - ${TAB_STRIP_RESERVE}px)`}
+                    // Never narrower than one tab and the strip's own
+                    // padding: below that the open tab's close
+                    // scrolls out of the strip, under the controls after it.
+                    // FOLD_SAVE_NOTE gives this floor its room.
+                    maxWidth={`max(${TAB_MIN_WIDTH + TAB_STRIP_PADDING}px, calc(100cqw - ${TAB_STRIP_RESERVE}px))`}
                     xstyle={styles.tabStrip}>
                     {tabs.map((tab, index) => {
                       // Tabs are all one width, so the rule marks a boundary
@@ -2037,7 +2089,10 @@ export default function CanvasEditor() {
                   />
                 </HStack>
                 <HStack gap={3} vAlign="center">
-                  <Text type="supporting" color="secondary">
+                  <Text
+                    type="supporting"
+                    color="secondary"
+                    xstyle={styles.foldsAtSaveNote}>
                     Saved · 2 min ago
                   </Text>
                   <DropdownMenu
@@ -2149,7 +2204,7 @@ export default function CanvasEditor() {
                         // over the backdrop rather than sitting on the sill.
                         padding={4}
                         content={
-                          <LayoutContent padding={6}>
+                          <LayoutContent padding={6} ref={canvasRef}>
                             <HStack
                               width="max-content"
                               height="max-content"
