@@ -147,6 +147,54 @@ describe('remoteImages', () => {
     ]);
   });
 
+  it('asks for no more images once the network answers none of the first ones', async () => {
+    const urls = Array.from(
+      {length: 10},
+      (_, i) => `https://example.com/${i}.png`,
+    );
+    const {fetch, asked} = fetchFrom(
+      Object.fromEntries(urls.map(url => [url, never])),
+    );
+    const remote = remoteImages({fetch, answerMs: 50, timeoutMs: 10_000});
+    const started = Date.now();
+    await remote.get(urls);
+    remote.done();
+    expect(Date.now() - started).toBeLessThan(2000);
+    // The first six went out at once and got no answer; the rest were never asked.
+    expect(asked).toHaveLength(6);
+    const reasons = remote.summary().failed.map(f => f.reason);
+    expect(reasons.slice(0, 6)).toEqual(
+      Array(6).fill('no answer within 0.05 s'),
+    );
+    expect(reasons.slice(6)).toEqual(
+      Array(4).fill(
+        'not asked: the network answered none of the first images the render asked for',
+      ),
+    );
+  });
+
+  it('keeps asking when the network answers, even if one server is slow', async () => {
+    const {fetch, asked} = fetchFrom({
+      'https://slow.example/a.png': never,
+      'https://slow.example/b.png': never,
+      'https://example.com/ok.png': png(),
+      'https://example.com/late.png': png(),
+    });
+    const remote = remoteImages({fetch, answerMs: 50, timeoutMs: 10_000});
+    await remote.get([
+      'https://example.com/ok.png',
+      'https://slow.example/a.png',
+      'https://slow.example/b.png',
+    ]);
+    await remote.get(['https://example.com/late.png']);
+    remote.done();
+    expect(asked.map(a => a.url)).toContain('https://example.com/late.png');
+    expect(remote.summary().fetched).toEqual([
+      'https://example.com/ok.png',
+      'https://example.com/late.png',
+    ]);
+  });
+
   it('tells an image by its bytes', () => {
     expect(imageTypeOf(PNG)).toBe('image/png');
     expect(imageTypeOf(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe(
@@ -249,7 +297,7 @@ describe('a render with images from the web', () => {
       expect(page.warnings).toContainEqual({
         code: 'remote-asset',
         message:
-          'https://example.com/away.png is loaded from the network, which a sandboxed page cannot reach (the render could not fetch it: the network could not reach it); save it beside the page and import it instead.',
+          'https://example.com/away.png is loaded from the network, which a sandboxed page cannot reach; save it beside the page and import it instead. The render could not fetch it: the network could not reach it.',
       });
     } finally {
       removeLinkedFixture(dir);
@@ -292,7 +340,9 @@ describe('a render with images from the web', () => {
       const {fetch, asked} = fetchFrom({
         'https://i.example.com/40?u=alex': png(),
         'https://i.example.com/40?u=jo': png(),
-        'https://example.com/not-really-an-image': respond('<html></html>', {headers: {'content-type': 'text/html'}}),
+        'https://example.com/not-really-an-image': respond('<html></html>', {
+          headers: {'content-type': 'text/html'},
+        }),
       });
       const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
       // A link or an API address is never fetched; only image-named literals are.
@@ -302,8 +352,16 @@ describe('a render with images from the web', () => {
         'https://i.example.com/40?u=jo',
       ]);
       expect(page.remoteImages).toEqual({
-        fetched: ['https://i.example.com/40?u=alex', 'https://i.example.com/40?u=jo'],
-        failed: [{url: 'https://example.com/not-really-an-image', reason: 'not an image'}],
+        fetched: [
+          'https://i.example.com/40?u=alex',
+          'https://i.example.com/40?u=jo',
+        ],
+        failed: [
+          {
+            url: 'https://example.com/not-really-an-image',
+            reason: 'not an image',
+          },
+        ],
       });
       expect(page.warnings).toContainEqual({
         code: 'remote-asset',
@@ -312,24 +370,41 @@ describe('a render with images from the web', () => {
       });
       // Opened after the click, offline: the avatars draw from the carried data.
       fs.writeFileSync(path.join(dir, 'page.html'), page.html);
-      const dom = new JSDOM(page.html, {runScripts: 'dangerously', pretendToBeVisual: true});
-      const settle = () => new Promise(resolve => dom.window.setTimeout(resolve, 100));
+      const dom = new JSDOM(page.html, {
+        runScripts: 'dangerously',
+        pretendToBeVisual: true,
+      });
+      const settle = () =>
+        new Promise(resolve => dom.window.setTimeout(resolve, 100));
       await settle();
       const doc = dom.window.document;
       expect(doc.querySelectorAll(`#${ROOT_ID} img`)).toHaveLength(0);
-      /** @type {HTMLButtonElement} */ (doc.querySelector(`#${ROOT_ID} button`)).click();
+      /** @type {HTMLButtonElement} */ (
+        doc.querySelector(`#${ROOT_ID} button`)
+      ).click();
       await settle();
-      const srcOf = (/** @type {string} */ alt) => doc.querySelector(`#${ROOT_ID} img[alt="${alt}"]`)?.getAttribute('src');
+      const srcOf = (/** @type {string} */ alt) =>
+        doc.querySelector(`#${ROOT_ID} img[alt="${alt}"]`)?.getAttribute('src');
       const data = `data:image/png;base64,${PNG.toString('base64')}`;
       expect(srcOf('Alex')).toBe(data);
       expect(srcOf('Jo')).toBe(data);
       expect(srcOf('Cover')).toBe('https://example.com/not-really-an-image');
-      expect(doc.querySelector(`#${ROOT_ID} a`)?.getAttribute('href')).toBe('https://example.com/guide');
+      expect(doc.querySelector(`#${ROOT_ID} a`)?.getAttribute('href')).toBe(
+        'https://example.com/guide',
+      );
       dom.window.close();
       // The way back is the page as written.
-      const back = /** @type {any} */ (await render('page.html', {cwd: dir, reverse: true, out: 'back/page.jsx'}));
+      const back = /** @type {any} */ (
+        await render('page.html', {
+          cwd: dir,
+          reverse: true,
+          out: 'back/page.jsx',
+        })
+      );
       expect(back.data.exact).toBe(true);
-      expect(fs.readFileSync(path.join(dir, 'back/page.jsx'), 'utf8')).toBe(source);
+      expect(fs.readFileSync(path.join(dir, 'back/page.jsx'), 'utf8')).toBe(
+        source,
+      );
     } finally {
       removeLinkedFixture(dir);
     }

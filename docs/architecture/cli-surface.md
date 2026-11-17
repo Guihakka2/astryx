@@ -1096,7 +1096,9 @@ an `https` address, once, while the page renders, and the file carries it.
 That is the only request a render makes for the page itself. A fetch sends no
 cookies or credentials and takes only an image, by its content type and its
 bytes, up to the size a render carries of one file. Each image has a time
-limit, and all the images of one render have one more. Any failure leaves the
+limit for its first answer and one for its last byte, and all the images of
+one render have one more; when the network answers none of the first images
+a render asks for, it asks for no more. Any failure leaves the
 address as the page wrote it, with the warning a remote image gets, and the
 result names every address fetched and every one that was not. The embedded
 source keeps the addresses, so `--reverse` gives back the page as written.
