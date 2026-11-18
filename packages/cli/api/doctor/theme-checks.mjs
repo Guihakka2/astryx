@@ -2306,10 +2306,15 @@ function oneModePageCheck(projectDir, theme) {
       painted = true;
       break;
     }
-    // (A theme whose one mode the module records, passed to the root
-    // Theme as `themeModes[…]`: Theme sets that mode, so the page follows
-    // it in every OS mode.)
-    if (theme.mode && /\bthemeModes\s*\[/.test(source)) {
+    // (A root Theme given a fixed mode, the theme's recorded one
+    // (`themeModes[…]`) or a literal `light` or `dark`: Theme marks the page
+    // with that mode, and Core's reset gives it that color scheme, so the
+    // text stays readable in every OS mode.)
+    if (
+      /\bmode\s*=\s*(?:["'](?:light|dark)["']|\{\s*(?:["'`](?:light|dark)["'`]|themeModes\s*\[))/.test(
+        source,
+      )
+    ) {
       painted = true;
       break;
     }

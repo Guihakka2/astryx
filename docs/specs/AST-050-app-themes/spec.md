@@ -285,7 +285,8 @@ use` or `theme remove` on a theme that is not added MUST fail and name the
   11. a default theme drawn for one mode (its page color dark in both modes,
       or light in both) has its page painted: `AppShell` renders, an `html`,
       `body` or `:root` background uses `--color-background-body`, or the root
-      `Theme` takes the theme's recorded mode; otherwise a warning, never a
+      `Theme` takes a fixed mode (the theme's recorded mode, or a literal
+      `light` or `dark`); otherwise a warning, never a
       failure, whose fix is to use `AppShell` or add
       `body { background: var(--color-background-body) }` to global CSS.
 

@@ -2078,6 +2078,22 @@ describe('app-theme doctor checks', () => {
     ).toMatchObject({status: 'pass'});
   });
 
+  it('passes the one-mode page check when the root Theme takes a literal mode', async () => {
+    const {dir} = await fixture([
+      {
+        slug: 'ocean',
+        css: '[data-astryx-theme="ocean"] { --color-background-body: #101314; }\n',
+      },
+    ]);
+    write(
+      path.join(dir, 'src/main.tsx'),
+      "import {Theme} from '@astryxdesign/core/theme';\nimport {themes, defaultThemeSlug} from './astryx-themes';\nexport const Root = () => <Theme theme={themes[defaultThemeSlug]} mode=\"dark\" />;\n",
+    );
+    expect(check(await checkAppThemes(dir), 'theme-page-color')).toMatchObject({
+      status: 'pass',
+    });
+  });
+
   it('counts only a body background that uses the page color', async () => {
     const {dir} = await fixture([
       {
