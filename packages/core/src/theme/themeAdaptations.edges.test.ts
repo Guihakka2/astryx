@@ -73,11 +73,9 @@ describe('size edges', () => {
   });
 
   it('spells "below" StyleX keys as the negated lower edges', () => {
-    expect(belowStyleKey({width: 768})).toBe(
-      '@media not all and (min-width: 768px)',
-    );
+    expect(belowStyleKey({width: 768})).toBe('@media (not (min-width: 768px))');
     expect(belowStyleKey({width: 768, height: 500})).toBe(
-      '@media not all and (min-width: 768px) and (min-height: 500px)',
+      '@media (not ((min-width: 768px) and (min-height: 500px)))',
     );
   });
 

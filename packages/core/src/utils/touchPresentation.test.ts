@@ -221,7 +221,7 @@ describe('touch presentation', () => {
       }),
     );
     expect(touchKeys.compact).toBe(
-      '@media not all and (min-width: 768px) and (min-height: 500px)',
+      '@media (not ((min-width: 768px) and (min-height: 500px)))',
     );
     expect(COMPACT_QUERY).toBe('(width < 768px), (height < 500px)');
     expect(COMPACT_TOUCH_QUERY).toBe(

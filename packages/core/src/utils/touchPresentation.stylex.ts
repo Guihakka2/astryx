@@ -28,7 +28,7 @@ export const touchKeys = stylex.defineConsts({
    * The viewport is compact: COMPACT_QUERY as a StyleX key (belowStyleKey).
    * For compact and touch, nest this key inside `touch`.
    */
-  compact: '@media not all and (min-width: 768px) and (min-height: 500px)',
+  compact: '@media (not ((min-width: 768px) and (min-height: 500px)))',
   /**
    * The iOS WebKit gate, inside `touch` (IOS_SUPPORTS_QUERY): only for a
    * style iOS WebKit itself requires (the 16px input floor), never a

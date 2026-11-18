@@ -61,10 +61,11 @@ export const DEFAULT_WIDTH_BREAKPOINTS: Readonly<WidthBreakpoints> =
 // StyleX lowers a range feature such as `(width < 768px)` to
 // `(max-width: 767.99px)`. Chromium rounds that length up to 768px, so the
 // rule also matches at exactly 768px wide, where the wider side must apply.
-// A StyleX key therefore says "below" as the negation of the
-// inclusive lower edge, which StyleX keeps as written and every browser
-// answers exactly. Script and plain CSS keep the range features, which the
-// browser reads directly.
+// A StyleX key therefore says "below" as the negation of the inclusive lower
+// edges. The negation is one parenthesized condition, so StyleX can combine it
+// with another media key on the same property and the result stays valid.
+// Script and plain CSS keep the range features, which the browser reads
+// directly.
 
 /** A width strictly below `px`, as a media feature for script or plain CSS. */
 export function widthBelowFeature(px: number): string {
@@ -92,12 +93,15 @@ export interface BelowEdges {
 /**
  * The StyleX media key for "narrower than `width`, or shorter than `height`".
  * Write the returned string as a literal key: a computed key gets a different
- * StyleX priority.
+ * StyleX priority. Put it after any other width or height key on the same
+ * property: StyleX rewrites an earlier size key to exclude the later ones and
+ * lowers the edges again.
  */
 export function belowStyleKey({width, height}: BelowEdges): string {
-  const heightEdge =
-    height === undefined ? '' : ` and (min-height: ${height}px)`;
-  return `@media not all and (min-width: ${width}px)${heightEdge}`;
+  const widthEdge = `(min-width: ${width}px)`;
+  return height === undefined
+    ? `@media (not ${widthEdge})`
+    : `@media (not (${widthEdge} and (min-height: ${height}px)))`;
 }
 
 /**
