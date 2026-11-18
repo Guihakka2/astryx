@@ -24,6 +24,7 @@ import * as path from 'node:path';
 import {findInstalledPackage} from '../fs/paths.mjs';
 import {inspectPackageExport} from './package-exports.mjs';
 import {babelParser} from '../runtime/lazy-dependencies.mjs';
+import {TS_SOURCES} from '../render/ts-paths.mjs';
 
 const MODULE_EXTENSIONS = [
   '.mjs',
@@ -276,14 +277,6 @@ function collectNodesOfType(node, type, found) {
 /** What a bundler also adds to an extensionless specifier. */
 const BUNDLER_EXTENSIONS = [...MODULE_EXTENSIONS, '.json'];
 
-/** The TypeScript files a bundler tries for a `.js`-family specifier. */
-const TYPESCRIPT_FOR = /** @type {Record<string, string[]>} */ ({
-  '.js': ['.ts', '.tsx'],
-  '.jsx': ['.tsx'],
-  '.mjs': ['.mts'],
-  '.cjs': ['.cts'],
-});
-
 /** @param {string} file */
 function isFileOnDisk(file) {
   try {
@@ -319,7 +312,7 @@ export function resolveLocalModule(specifier, fromFile, options = {}) {
   const candidates = [base];
   if (bundler) {
     const extension = path.extname(base);
-    for (const typed of TYPESCRIPT_FOR[extension] ?? []) {
+    for (const typed of TS_SOURCES[extension] ?? []) {
       candidates.push(`${base.slice(0, -extension.length)}${typed}`);
     }
   }
