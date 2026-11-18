@@ -102,15 +102,19 @@ function nearestFolder(at) {
  * @returns {unknown}
  */
 function computerTextFailed(err, home, remove) {
-  const {code, path: at, removed} = /** @type {{code?: unknown, path?: unknown, removed?: string[]}} */ (
+  const {code, path: at, removed, syscall} = /** @type {{code?: unknown, path?: unknown, removed?: string[], syscall?: unknown}} */ (
     err ?? {}
   );
   if (typeof code !== 'string' || typeof at !== 'string') return err;
   const again = remove ? 'astryx init --user --remove-agents' : 'astryx init --user';
+  // An open that fails on a file that exists is refused by the file itself
+  // (read-only, or owned by root after a sudo run); a mkdir, an unlink, or a
+  // missing target is refused by the folder that holds it.
+  const fix = syscall === 'open' && fs.existsSync(at) ? at : nearestFolder(at);
   /** @type {Record<string, string>} */
   const nextFor = {
-    EACCES: `Give yourself write access to ${displayHomePath(nearestFolder(at), home)}, then run \`${again}\` again.`,
-    EPERM: `Give yourself write access to ${displayHomePath(nearestFolder(at), home)}, then run \`${again}\` again.`,
+    EACCES: `Give yourself write access to ${displayHomePath(fix, home)}, then run \`${again}\` again.`,
+    EPERM: `Give yourself write access to ${displayHomePath(fix, home)}, then run \`${again}\` again.`,
     EROFS: `That folder is on a read-only file system; run \`${again}\` where your home folder can be written.`,
     ENOTDIR: `A file stands where a folder belongs on that path (such as ~/.agents being a file); move it aside, then run \`${again}\` again.`,
   };

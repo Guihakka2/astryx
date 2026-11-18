@@ -7,6 +7,7 @@
  * path.
  */
 
+import {createHash} from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -16,6 +17,7 @@ import {user} from './user.mjs';
 import {runWithCliDoor} from '../../../foundation/env/cli-command.mjs';
 import {renderComputerAgentText} from '../../../foundation/agent-docs/computer-agent-text.mjs';
 import {runCli} from '../../../test-utils/run-cli.mjs';
+import {MARKER_END, MARKER_START} from '../../../foundation/agent-docs/agent-doc-state.mjs';
 import {settingsFile} from '../../../foundation/env/user-settings.mjs';
 import {readGlobalState} from '../../../foundation/release/global-state.mjs';
 import {cliVersion} from '../../../foundation/release/run-context.mjs';
@@ -279,7 +281,7 @@ describe('a computer-level folder the user cannot write', () => {
       // An old managed copy in a folder the user cannot write.
       fs.rmSync(link);
       fs.mkdirSync(link);
-      fs.writeFileSync(path.join(link, 'SKILL.md'), fs.readFileSync(skill, 'utf8').replace(/astryx/u, 'astryx'));
+      fs.copyFileSync(skill, path.join(link, 'SKILL.md'));
       fs.rmSync(skill);
       fs.chmodSync(link, 0o555);
       try {
@@ -289,6 +291,28 @@ describe('a computer-level folder the user cannot write', () => {
         expect(res.data.files.find(file => file.path === link)).toMatchObject({action: 'kept'});
       } finally {
         fs.chmodSync(link, 0o755);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'names the skill file itself when an older one exists and cannot be written',
+    async () => {
+      const skill = path.join(home, '.agents', 'skills', 'astryx', 'SKILL.md');
+      fs.mkdirSync(path.dirname(skill), {recursive: true});
+      // An unedited file an older release wrote.
+      const START = MARKER_START;
+      const body = `---\nname: astryx\n---\n\n${START}\nold\n${MARKER_END}\n`;
+      const hash = createHash('sha256').update(body).digest('hex');
+      fs.writeFileSync(skill, body.replace(`${START}\n`, `${START}\n<!-- astryx-managed sha256:${hash} -->\n`));
+      fs.chmodSync(skill, 0o444);
+      try {
+        await expect(init({user: true}, {cwd: tmp('cwd')})).rejects.toMatchObject({
+          code: 'ERR_WRITE_FAILED',
+          message: expect.stringContaining('Give yourself write access to ~/.agents/skills/astryx/SKILL.md,'),
+        });
+      } finally {
+        fs.chmodSync(skill, 0o644);
       }
     },
   );
