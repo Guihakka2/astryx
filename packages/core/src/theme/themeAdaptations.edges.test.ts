@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
+import {touchKeys} from '../utils/touchPresentation.stylex';
 import {
   belowStyleKey,
   heightBelowFeature,
@@ -45,6 +46,67 @@ function handWrittenEdges(source: string): string[] {
     .filter(line => !/^\s*(\*|\/\/)/.test(line))
     .filter(line => /['"`]/.test(line))
     .filter(line => HAND_WRITTEN_EDGE.some(pattern => pattern.test(line)));
+}
+
+/** The index of the `{` that opens the object around `at`. */
+function openingBrace(source: string, at: number): number {
+  let depth = 0;
+  for (let index = at - 1; index >= 0; index -= 1) {
+    if (source[index] === '}') {
+      depth += 1;
+    }
+    if (source[index] === '{') {
+      if (depth === 0) {
+        return index;
+      }
+      depth -= 1;
+    }
+  }
+  return 0;
+}
+
+/** The index just past the `}` that closes the object opened at `start`. */
+function closingBrace(source: string, start: number): number {
+  let depth = 0;
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === '{') {
+      depth += 1;
+    }
+    if (source[index] === '}' && --depth === 0) {
+      return index + 1;
+    }
+  }
+  return source.length;
+}
+
+// StyleX makes an earlier media key on a property exclude the later ones,
+// and lowers the edges it negates to lengths Chromium rounds up. So a "below"
+// key comes after every other width or height key on its property, whether
+// it sits in the property's object or in an at-rule nested there.
+function sizeKeysAfter(source: string, key: string): string[] {
+  const found: string[] = [];
+  for (
+    let at = source.indexOf(`'${key}'`);
+    at >= 0;
+    at = source.indexOf(`'${key}'`, at + 1)
+  ) {
+    let start = openingBrace(source, at);
+    if (/'@[^'\n]*'\s*:\s*$/.test(source.slice(0, start))) {
+      start = openingBrace(source, start);
+    }
+    const after = source.slice(
+      at + key.length + 2,
+      closingBrace(source, start),
+    );
+    for (const match of after.matchAll(
+      /'(@(?:media|container)[^'\n]*)'\s*:/g,
+    )) {
+      if (/\b(width|height)\b/.test(match[1])) {
+        found.push(match[1]);
+      }
+    }
+  }
+  return found;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -115,6 +177,41 @@ describe('size edges', () => {
           }
           found.push(`${path.relative(CORE_SRC, file)}: ${line.trim()}`);
         }
+      }
+    }
+    expect(found).toEqual([]);
+  });
+
+  it('finds a size key written after a "below" key, and none written before it', () => {
+    const below = belowStyleKey({width: 768, height: 500});
+    expect(
+      sizeKeysAfter(
+        `x: {color: {default: 'a', '${below}': 'b', '@media (min-width: 1024px)': 'c'}}`,
+        below,
+      ),
+    ).toEqual(['@media (min-width: 1024px)']);
+    expect(
+      sizeKeysAfter(
+        `x: {color: {default: 'a', '@media (pointer: coarse)': {default: null, '${below}': 'b'}, '@media (max-height: 400px)': 'c'}}`,
+        below,
+      ),
+    ).toEqual(['@media (max-height: 400px)']);
+    expect(
+      sizeKeysAfter(
+        `x: {color: {default: 'a', '@media (min-width: 1024px)': 'c', '${below}': 'b', '@media (pointer: coarse)': 'd'}}, y: {color: {'@media (min-width: 1024px)': 'e'}}`,
+        below,
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps every compact key in Core after the other size keys on its property', () => {
+    const found: string[] = [];
+    for (const file of sourceFiles(CORE_SRC)) {
+      for (const key of sizeKeysAfter(
+        fs.readFileSync(file, 'utf8'),
+        touchKeys.compact,
+      )) {
+        found.push(`${path.relative(CORE_SRC, file)}: ${key}`);
       }
     }
     expect(found).toEqual([]);

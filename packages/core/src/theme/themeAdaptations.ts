@@ -93,9 +93,10 @@ export interface BelowEdges {
 /**
  * The StyleX media key for "narrower than `width`, or shorter than `height`".
  * Write the returned string as a literal key: a computed key gets a different
- * StyleX priority. Put it after any other width or height key on the same
- * property: StyleX rewrites an earlier size key to exclude the later ones and
- * lowers the edges again.
+ * StyleX priority. Put it after every other width or height key on the same
+ * property: StyleX rewrites an earlier key to exclude the later ones and
+ * lowers the edges it negates. themeAdaptations.edges.test.ts enforces this
+ * for the compact key.
  */
 export function belowStyleKey({width, height}: BelowEdges): string {
   const widthEdge = `(min-width: ${width}px)`;
