@@ -792,6 +792,36 @@ function nameOfValue(p) {
  * @param {any} p a path to the literal
  */
 function reachesLink(p) {
+  return readsOf(p).some(ref => {
+    const named = nameOfValue(ref);
+    return Boolean(named && LINK_ATTR.test(named.name));
+  });
+}
+
+/**
+ * Whether the page changes an address with the URL API (`new URL(photo)`),
+ * written there or through a variable: the API writes a query before the
+ * fragment, so the address cannot be carried as a data: URI.
+ * @param {any} p a path to the literal
+ */
+function reachesUrlApi(p) {
+  /** @param {any} at */
+  const isUrlArgument = at =>
+    at.parentPath?.isNewExpression() &&
+    at.parentPath.node.callee.type === 'Identifier' &&
+    at.parentPath.node.callee.name === 'URL' &&
+    at.parentPath.node.arguments[0] === at.node;
+  return isUrlArgument(p) || readsOf(p).some(isUrlArgument);
+}
+
+/**
+ * The reads of the variable a literal is the value of (`const full = '…'`),
+ * through the expressions that only choose or wrap it; none when the literal
+ * is not a variable's value.
+ * @param {any} p a path to the literal
+ * @returns {any[]}
+ */
+function readsOf(p) {
   let at = p;
   while (
     at.parentPath &&
@@ -804,16 +834,10 @@ function reachesLink(p) {
     at = at.parentPath;
   }
   const declarator = at.parentPath;
-  if (!declarator?.isVariableDeclarator() || declarator.node.init !== at.node) return false;
+  if (!declarator?.isVariableDeclarator() || declarator.node.init !== at.node) return [];
   const id = declarator.node.id;
-  if (id.type !== 'Identifier') return false;
-  const binding = declarator.scope.getBinding(id.name);
-  return Boolean(
-    binding?.referencePaths.some((/** @type {any} */ ref) => {
-      const named = nameOfValue(ref);
-      return Boolean(named && LINK_ATTR.test(named.name));
-    }),
-  );
+  if (id.type !== 'Identifier') return [];
+  return declarator.scope.getBinding(id.name)?.referencePaths ?? [];
 }
 
 /**
@@ -906,6 +930,16 @@ function pagePlugin(filename, browser = false) {
     const {start, end} = p.node;
     const text = typeof start === 'number' && typeof end === 'number' ? p.hub?.file?.code?.slice(start, end) : null;
     builtRemote.push({text: text ?? '(an address built in code)', file: filename, line: p.node.loc?.start.line ?? 0});
+  };
+  /**
+   * Record an https image address the page changes with the URL API: kept as
+   * written, it gets the warning a built address gets.
+   * @param {any} p
+   */
+  const changedAddress = p => {
+    const {start, end} = p.node;
+    const text = typeof start === 'number' && typeof end === 'number' ? p.hub?.file?.code?.slice(start, end) : null;
+    builtRemote.push({text: text ?? '(an address changed in code)', file: filename, line: p.node.loc?.start.line ?? 0});
   };
   return (/** @type {any} */ {types: t}) => ({
     visitor: {
@@ -1055,14 +1089,24 @@ function pagePlugin(filename, browser = false) {
         // The first part of an address built with `+` is not an address: the
         // chain gets its own warning.
         if (p.parentPath.isBinaryExpression({operator: '+'})) return;
-        noteRemoteLiteral(p.node.value, imageLiteralKind(p.node.value, p));
+        const why = imageLiteralKind(p.node.value, p);
+        if (why && reachesUrlApi(p)) {
+          changedAddress(p);
+          return;
+        }
+        noteRemoteLiteral(p.node.value, why);
       },
       TemplateLiteral(/** @type {any} */ p) {
         if (browser || p.parentPath.isTaggedTemplateExpression()) return;
         if (p.node.expressions.length === 0) {
           if (p.parentPath.isBinaryExpression({operator: '+'})) return;
           const value = p.node.quasis[0]?.value.cooked ?? '';
-          noteRemoteLiteral(value, imageLiteralKind(value, p));
+          const why = imageLiteralKind(value, p);
+          if (why && reachesUrlApi(p)) {
+            changedAddress(p);
+            return;
+          }
+          noteRemoteLiteral(value, why);
           return;
         }
         builtAddress(p, /^https:\/\//i.test(p.node.quasis[0]?.value.cooked ?? ''));

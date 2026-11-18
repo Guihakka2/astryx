@@ -841,6 +841,73 @@ describe('a render with images from the web', () => {
     }
   }, 120_000);
 
+  it('keeps an address the code changes with the URL API as written, and warns for it', async () => {
+    const dir = makeLinkedFixture('astryx-render-url-api-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const photo = 'https://cdn.example.com/photo.png';",
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  const url = new URL(photo);',
+          "  url.searchParams.set('w', '400');",
+          '  return <main><button onClick={() => setOpen(true)}>Show</button>{open && <img src={url.href} alt="" />}</main>;',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({
+        'https://cdn.example.com/photo.png': png(),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      expect(asked).toEqual([]);
+      expect(page.html.slice(page.html.lastIndexOf('<script>'))).toContain(
+        'https://cdn.example.com/photo.png',
+      );
+      expect(
+        page.warnings.some(
+          w =>
+            w.code === 'remote-asset' &&
+            w.message.includes(
+              "'https://cdn.example.com/photo.png' (page.jsx:2) builds an image address in code",
+            ),
+        ),
+      ).toBe(true);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('names the whole address of first-paint images that differ only by their query', async () => {
+    const dir = makeLinkedFixture('astryx-render-query-two-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        'export default function Page() { return <main><img src="https://example.com/a.png?w=1" alt="" /><img src="https://example.com/a.png?w=2" alt="" /></main>; }\n',
+      );
+      const {fetch} = fetchFrom({});
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      const messages = page.warnings
+        .filter(w => w.code === 'remote-asset')
+        .map(w => w.message);
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toContain('https://example.com/a.png?w=1');
+      expect(messages[1]).toContain('https://example.com/a.png?w=2');
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
   it('warns once for a first-paint image whose address has a query', async () => {
     const dir = makeLinkedFixture('astryx-render-query-', [
       'react',

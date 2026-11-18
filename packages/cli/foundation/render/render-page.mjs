@@ -877,7 +877,7 @@ function inlineAssets(text, kind, ctx) {
         ctx.counted.add(key);
         ctx.warnings.push({
           code: 'remote-asset',
-          message: `${clean} is loaded from the network, which a sandboxed page cannot reach; save it beside the page and import it instead.${fetched ? ` The render could not fetch it: ${fetched.reason}.` : ''}`,
+          message: `${named.url} is loaded from the network, which a sandboxed page cannot reach; save it beside the page and import it instead.${fetched ? ` The render could not fetch it: ${fetched.reason}.` : ''}`,
         });
       }
       return null;
