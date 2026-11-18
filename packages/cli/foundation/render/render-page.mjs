@@ -1194,6 +1194,19 @@ export async function renderPage(entry, options = {}) {
   };
   /** Stylesheets pulled in by another's `@import`. @type {Set<string>} */
   const carriedCss = new Set();
+  // An https image address the page changes with the URL API stays as
+  // written: the API writes a query before the fragment, so no data: URI can
+  // stand in for it. A literal of a property the page reads into the API, in
+  // any file, counts too.
+  const urlProps = new Set(/** @type {string[]} */ (message.urlApiProps ?? []));
+  const keptAsWritten = new Set(/** @type {string[]} */ (message.urlChanged ?? []));
+  /** @type {{text: string, file: string, line: number, how?: 'url'}[]} */
+  const builtList = [...(message.builtRemote ?? [])];
+  for (const keyed of /** @type {{value: string, key: string, text: string, file: string, line: number}[]} */ (message.keyedLiterals ?? [])) {
+    if (!urlProps.has(keyed.key)) continue;
+    keptAsWritten.add(keyed.value);
+    builtList.push({text: keyed.text, file: keyed.file, line: keyed.line, how: 'url'});
+  }
   // The images the markup, the page's own CSS and its literals name are
   // asked for together, so a machine with no network waits for one answer
   // window, not one per text.
@@ -1201,7 +1214,9 @@ export async function renderPage(entry, options = {}) {
     await remote.get([
       ...remoteRefsIn(markup, 'html', ctx),
       ...(message.css ? remoteRefsIn(message.css, 'css', ctx) : []),
-      ...(typeof message.script === 'string' ? /** @type {string[]} */ (message.remoteLiterals ?? []) : []),
+      ...(typeof message.script === 'string'
+        ? /** @type {string[]} */ (message.remoteLiterals ?? []).filter(url => !keptAsWritten.has(url))
+        : []),
     ]);
   }
   try {
@@ -1240,7 +1255,7 @@ export async function renderPage(entry, options = {}) {
   // not show (the next view, a feed after a click): fetched the same way, so
   // the script draws them from the same carried data.
   if (remote && script !== null) {
-    const literals = /** @type {string[]} */ (message.remoteLiterals ?? []);
+    const literals = /** @type {string[]} */ (message.remoteLiterals ?? []).filter(url => !keptAsWritten.has(url));
     const namedOnly = new Set(/** @type {string[]} */ (message.remoteNamedOnly ?? []));
     await remote.get(literals);
     for (const url of literals) {
@@ -1280,15 +1295,21 @@ export async function renderPage(entry, options = {}) {
   }
   /** Built addresses named in a warning already. @type {Set<string>} */
   const builtNamed = new Set();
-  for (const built of /** @type {{text: string, file: string, line: number}[]} */ (message.builtRemote ?? [])) {
+  for (const built of builtList) {
     const where = `${path.relative(dir, built.file).split(path.sep).join('/')}:${built.line}`;
     if (builtNamed.has(`${where} ${built.text}`)) continue;
     builtNamed.add(`${where} ${built.text}`);
     warnings.push({
       code: 'remote-asset',
-      message: `${built.text} (${where}) builds an image address in code, so the render cannot carry it: the file asks the network for it when the script draws it. Write the address whole, or save the image beside the page and import it.`,
+      message:
+        built.how === 'url'
+          ? `${built.text} (${where}) is an image address the page changes with the URL API, so the render cannot carry it: the file asks the network for it when the script draws it. Save the image beside the page and import it.`
+          : `${built.text} (${where}) builds an image address in code, so the render cannot carry it: the file asks the network for it when the script draws it. Write the address whole, or save the image beside the page and import it.`,
     });
   }
+  // The script keeps such an address as written, also where the first paint
+  // carries it.
+  for (const url of keptAsWritten) ctx.rewrites.delete(url);
   // The script draws the page again with the paths the page wrote, so each
   // image the first paint shows from its carried data keeps showing.
   // In the script, a carried https address becomes its data: URI with an

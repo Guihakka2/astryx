@@ -875,10 +875,84 @@ describe('a render with images from the web', () => {
           w =>
             w.code === 'remote-asset' &&
             w.message.includes(
-              "'https://cdn.example.com/photo.png' (page.jsx:2) builds an image address in code",
+              "'https://cdn.example.com/photo.png' (page.jsx:2) is an image address the page changes with the URL API",
             ),
         ),
       ).toBe(true);
+    } finally {
+      removeLinkedFixture(dir);
+    }
+  }, 120_000);
+
+  it('keeps an address as written that reaches the URL API through a property, a helper, or beside the first paint', async () => {
+    const dir = makeLinkedFixture('astryx-render-url-api-reach-', [
+      'react',
+      'react-dom',
+    ]);
+    try {
+      const file = path.join(dir, 'page.jsx');
+      fs.writeFileSync(
+        file,
+        [
+          "import {useState} from 'react';",
+          "const items = [{name: 'A', photoUrl: 'https://cdn.example.com/a.png'}];",
+          "const shown = 'https://cdn.example.com/d.png';",
+          'function sized(src) {',
+          '  const url = new URL(src);',
+          "  url.searchParams.set('w', '400');",
+          '  return url.href;',
+          '}',
+          'export default function Page() {',
+          '  const [open, setOpen] = useState(false);',
+          '  const first = new URL(items[0].photoUrl);',
+          "  first.searchParams.set('w', '400');",
+          '  return (',
+          '    <main>',
+          '      <img src={shown} alt="Shown" />',
+          '      <button onClick={() => setOpen(true)}>Show</button>',
+          '      {open && <img src={first.href} alt="Property" />}',
+          '      {open && <img src={sized(\'https://cdn.example.com/b.png\')} alt="Helper" />}',
+          '      {open && <img src={sized(shown)} alt="Both" />}',
+          '    </main>',
+          '  );',
+          '}',
+          '',
+        ].join('\n'),
+      );
+      const {fetch, asked} = fetchFrom({
+        'https://cdn.example.com/a.png': png(),
+        'https://cdn.example.com/b.png': png(),
+        'https://cdn.example.com/d.png': png(),
+      });
+      const page = await renderPage(file, {cwd: dir, remoteImages: {fetch}});
+      const data = `data:image/png;base64,${PNG.toString('base64')}`;
+      const script = page.html.slice(page.html.lastIndexOf('<script>'));
+      // The first paint still carries the image it shows.
+      expect(asked.map(a => a.url)).toEqual(['https://cdn.example.com/d.png']);
+      expect(renderedMarkupOf(page.html)).toContain(data);
+      // The script keeps each address the URL API changes as written.
+      for (const url of [
+        'https://cdn.example.com/a.png',
+        'https://cdn.example.com/b.png',
+        'https://cdn.example.com/d.png',
+      ]) {
+        expect(script).toContain(url);
+      }
+      expect(script).not.toContain(`${data}#`);
+      const changed = page.warnings.filter(
+        w =>
+          w.code === 'remote-asset' &&
+          w.message.includes('changes with the URL API'),
+      );
+      expect(
+        changed.map(w => w.message.slice(0, w.message.indexOf(')') + 1)),
+      ).toEqual(
+        expect.arrayContaining([
+          "'https://cdn.example.com/a.png' (page.jsx:2)",
+          "'https://cdn.example.com/b.png' (page.jsx:18)",
+          "'https://cdn.example.com/d.png' (page.jsx:3)",
+        ]),
+      );
     } finally {
       removeLinkedFixture(dir);
     }
