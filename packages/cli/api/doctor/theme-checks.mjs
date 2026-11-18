@@ -23,7 +23,7 @@ import {
   doctorHex,
   doctorLuminance,
   doctorParseColor,
-  doctorOutermostElementProps,
+  doctorOutermostElements,
   doctorRendersElement,
   doctorStylesheetImports,
   findDoctorInstalledPackage,
@@ -2256,7 +2256,8 @@ function paintsPageColor(css) {
 }
 
 /**
- * Whether a module's outermost Core `Theme` elements are given a fixed mode:
+ * Whether a module's outermost Core `Theme` that takes the default theme
+ * (`themes[defaultThemeSlug]`) is given a fixed mode:
  * a literal `light` or `dark`, or, for a theme whose one mode the module
  * records, its `themeModes[…]` entry, alone or with a fallback (`??
  * 'system'`, as `theme add` wires it). Theme marks the page with that mode,
@@ -2278,12 +2279,32 @@ function rootThemeFixesMode(file, recorded) {
     e.computed &&
     e.object?.type === 'Identifier' &&
     e.object.name === 'themeModes';
-  return doctorOutermostElementProps(file, {
+  /** @param {any} tag @param {string} name */
+  const attribute = (tag, name) =>
+    (tag.attributes ?? []).find(
+      (/** @type {any} */ a) =>
+        a.type === 'JSXAttribute' && a.name?.name === name,
+    );
+  // (The app's own root: the Theme given `themes[defaultThemeSlug]`, never
+  // a section's Theme for one named theme.)
+  /** @param {any} tag */
+  const takesDefault = tag => {
+    const e = attribute(tag, 'theme')?.value?.expression;
+    return (
+      e?.type === 'MemberExpression' &&
+      e.computed &&
+      e.object?.type === 'Identifier' &&
+      e.object.name === 'themes' &&
+      e.property?.type === 'Identifier' &&
+      e.property.name === 'defaultThemeSlug'
+    );
+  };
+  return doctorOutermostElements(file, {
     sources: CORE_THEME_SOURCES,
     name: 'Theme',
-    prop: 'mode',
-  }).some(attribute => {
-    const v = attribute?.value;
+  }).some(tag => {
+    if (!takesDefault(tag)) return false;
+    const v = attribute(tag, 'mode')?.value;
     if (v?.type === 'StringLiteral') return literal(v);
     if (v?.type !== 'JSXExpressionContainer') return false;
     const e = v.expression;
@@ -2406,7 +2427,7 @@ function oneModePageCheck(projectDir, theme) {
         label: 'Page color for a one-mode theme',
         status: 'warn',
         message: `${theme.slug} is drawn for ${mode} mode only, and nothing paints the app's page: no AppShell renders, no stylesheet gives the body the page color, and the root Theme is not given the theme's mode. In ${other} OS mode its text sits on the browser's own page color.`,
-        fix: "Wrap the page in AppShell; if you can't, pass the theme's mode to the root Theme (mode={themeModes[defaultThemeSlug]}), or add `body { background: var(--color-background-body) }` to global CSS (the purity check flags any stylesheet, so prefer AppShell).",
+        fix: `Wrap the page in AppShell; if you can't, pass the theme's mode to the root Theme (${theme.mode ? 'mode={themeModes[defaultThemeSlug]}' : `mode="${mode}"`}), or add \`body { background: var(--color-background-body) }\` to global CSS (the purity check flags any stylesheet, so prefer AppShell).`,
       };
 }
 

@@ -57,7 +57,7 @@ export {
 } from '../../foundation/discovery/icon-set-discovery.mjs';
 import {
   elementPropOrigins,
-  outermostElementProps,
+  outermostElements,
   rendersElement,
 } from '../../foundation/discovery/module-exports.mjs';
 import {cssImports} from '../../foundation/render/embedded-imports.mjs';
@@ -467,13 +467,13 @@ export {
 export {luminance as doctorLuminance} from '../theme/palette/generate/color.mjs';
 
 /**
- * The `prop` attribute of each outermost element a module renders, imported
- * by name from a module (see `outermostElementProps`).
+ * The opening tag of each outermost element a module renders, imported by
+ * name from a module (see `outermostElements`).
  * @param {string} file
- * @param {Parameters<typeof outermostElementProps>[1]} element
+ * @param {Parameters<typeof outermostElements>[1]} element
  */
-export function doctorOutermostElementProps(file, element) {
-  return outermostElementProps(file, element);
+export function doctorOutermostElements(file, element) {
+  return outermostElements(file, element);
 }
 
 /**

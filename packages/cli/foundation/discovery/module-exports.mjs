@@ -1818,15 +1818,14 @@ function importedElements(ast, sources, name) {
 }
 
 /**
- * The `prop` attribute of each outermost `<Name>` element a module renders
- * (one inside no other `<Name>`), `Name` a runtime import of `name` from one
- * of `sources` (renames included), read without running anything: the
- * attribute's syntax node, or null for an element without it.
+ * The opening tag of each outermost `<Name>` element a module renders (one
+ * inside no other `<Name>`), `Name` a runtime import of `name` from one of
+ * `sources` (renames included), read without running anything.
  * @param {string} file
- * @param {{sources: ReadonlySet<string>, name: string, prop: string}} element
+ * @param {{sources: ReadonlySet<string>, name: string}} element
  * @returns {any[]}
  */
-export function outermostElementProps(file, {sources, name, prop}) {
+export function outermostElements(file, {sources, name}) {
   let ast;
   try {
     ast = parseModule(file);
@@ -1847,13 +1846,7 @@ export function outermostElementProps(file, {sources, name, prop}) {
     const node = /** @type {any} */ (value);
     let within = inside;
     if (node.type === 'JSXElement' && opening.has(node.openingElement)) {
-      if (!inside)
-        out.push(
-          (node.openingElement.attributes ?? []).find(
-            (/** @type {any} */ item) =>
-              item.type === 'JSXAttribute' && item.name?.name === prop,
-          ) ?? null,
-        );
+      if (!inside) out.push(node.openingElement);
       within = true;
     }
     for (const [key, child] of Object.entries(node)) {
