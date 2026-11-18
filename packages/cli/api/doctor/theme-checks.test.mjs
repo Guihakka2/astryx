@@ -2094,6 +2094,23 @@ describe('app-theme doctor checks', () => {
     });
   });
 
+  it('reads an oklch page color, and counts no nested Theme, other mode prop, custom property or commented rule', async () => {
+    const css =
+      '[data-astryx-theme="ocean"] { --color-background-body: oklch(0.2 0.02 250); }\n';
+    const {dir} = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(dir, 'src/main.tsx'),
+      "import {Theme} from '@astryxdesign/core/theme';\nimport {MediaTheme} from './media';\nimport {themes, defaultThemeSlug} from './astryx-themes';\nexport const Root = () => <Theme theme={themes[defaultThemeSlug]}><MediaTheme mode=\"dark\" /><Theme theme={themes[defaultThemeSlug]} mode=\"light\" /></Theme>;\n",
+    );
+    write(
+      path.join(dir, 'src/global.css'),
+      ':root { --page-background: var(--color-background-body); }\n/* body { background: var(--color-background-body); } */\n',
+    );
+    expect(check(await checkAppThemes(dir), 'theme-page-color')).toMatchObject({
+      status: 'warn',
+    });
+  });
+
   it('counts only a body background that uses the page color', async () => {
     const {dir} = await fixture([
       {

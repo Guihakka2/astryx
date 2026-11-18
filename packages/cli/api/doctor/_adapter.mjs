@@ -459,6 +459,12 @@ export function doctorElementPropOrigins(file, element) {
   return elementPropOrigins(file, element);
 }
 
+export {
+  parseColor as doctorParseColor,
+  hex as doctorHex,
+} from '../theme-edit/_color.mjs';
+export {luminance as doctorLuminance} from '../theme/palette/generate/color.mjs';
+
 /**
  * Whether a module renders an element imported by name from a module (see
  * `rendersElement`).

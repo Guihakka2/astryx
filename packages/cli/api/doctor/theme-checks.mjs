@@ -20,6 +20,9 @@ import {
   corePeerRange,
   findDoctorCoreDir,
   doctorElementPropOrigins,
+  doctorHex,
+  doctorLuminance,
+  doctorParseColor,
   doctorRendersElement,
   doctorStylesheetImports,
   findDoctorInstalledPackage,
@@ -2218,22 +2221,117 @@ export async function checkAppThemes(cwd) {
  * @returns {boolean | null}
  */
 function lightSide(value) {
-  const v = value.trim().toLowerCase();
-  let rgb = null;
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})(?:[0-9a-f]{2})?$/.exec(v);
-  if (hex) {
-    const h =
-      hex[1].length === 3 ? [...hex[1]].map(c => c + c).join('') : hex[1];
-    rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb = doctorParseColor(value);
+  return rgb ? doctorLuminance(doctorHex(rgb)) > 0.18 : null;
+}
+
+/**
+ * Whether a stylesheet gives the page the theme's page color: a
+ * `background` or `background-color` on `html`, `body` or `:root` that uses
+ * `--color-background-body`, read with postcss, so a comment or another
+ * property never counts.
+ * @param {string} css
+ */
+function paintsPageColor(css) {
+  let root;
+  try {
+    root = postcss().parse(css);
+  } catch {
+    return false;
   }
-  const fn = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(v);
-  if (fn) rgb = [fn[1], fn[2], fn[3]].map(Number);
-  if (!rgb) return null;
-  const [r, g, b] = rgb.map(c => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  let paints = false;
+  root.walkRules(rule => {
+    if (
+      !rule.selectors.some(selector =>
+        /^(?:html|body|:root)$/i.test(selector.trim()),
+      )
+    )
+      return;
+    rule.walkDecls(/^background(?:-color)?$/i, decl => {
+      if (/var\(\s*--color-background-body\b/.test(decl.value)) paints = true;
+    });
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18;
+  return paints;
+}
+
+/**
+ * Whether a module's outermost Core `Theme` elements are given a fixed mode:
+ * a literal `light` or `dark`, or the theme module's `themeModes[…]`. Theme
+ * marks the page with that mode, and Core's reset gives it that color
+ * scheme. A Theme inside another Theme, or another component's `mode`, does
+ * not count.
+ * @param {string} source
+ */
+function rootThemeFixesMode(source) {
+  let ast;
+  try {
+    ast = parseModule(source);
+  } catch {
+    return false;
+  }
+  /** @type {Set<string>} */
+  const names = new Set();
+  walkAst(ast, node => {
+    if (
+      node.type === 'ImportDeclaration' &&
+      /^@astryxdesign\/core(?:\/theme|\/Theme)?$/.test(node.source?.value) &&
+      node.importKind !== 'type'
+    )
+      for (const s of node.specifiers ?? [])
+        if (s.type === 'ImportSpecifier' && s.imported?.name === 'Theme')
+          names.add(s.local.name);
+  });
+  if (!names.size) return false;
+  /** @param {any} attribute */
+  const fixed = attribute => {
+    const v = attribute?.value;
+    if (v?.type === 'StringLiteral') return /^(?:light|dark)$/.test(v.value);
+    if (v?.type !== 'JSXExpressionContainer') return false;
+    const e = v.expression;
+    if (e?.type === 'StringLiteral') return /^(?:light|dark)$/.test(e.value);
+    if (e?.type === 'TemplateLiteral' && !e.expressions.length)
+      return /^(?:light|dark)$/.test(e.quasis[0]?.value?.cooked ?? '');
+    return (
+      e?.type === 'MemberExpression' &&
+      e.computed &&
+      e.object?.type === 'Identifier' &&
+      e.object.name === 'themeModes'
+    );
+  };
+  let found = false;
+  /** @param {unknown} value @param {boolean} inside */
+  const visit = (value, inside) => {
+    if (found || value == null || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, inside);
+      return;
+    }
+    const node = /** @type {any} */ (value);
+    let within = inside;
+    if (
+      node.type === 'JSXElement' &&
+      node.openingElement?.name?.type === 'JSXIdentifier' &&
+      names.has(node.openingElement.name.name)
+    ) {
+      if (!inside) {
+        const mode = (node.openingElement.attributes ?? []).find(
+          (/** @type {any} */ a) =>
+            a.type === 'JSXAttribute' && a.name?.name === 'mode',
+        );
+        if (fixed(mode)) {
+          found = true;
+          return;
+        }
+      }
+      within = true;
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (['loc', 'start', 'end', 'extra'].includes(key)) continue;
+      visit(child, within);
+    }
+  };
+  visit(ast, false);
+  return found;
 }
 
 /**
@@ -2284,11 +2382,7 @@ function oneModePageCheck(projectDir, theme) {
     }
     if (generatedThemeFile(source)) continue;
     if (path.extname(file) === '.css') {
-      if (
-        /(?:^|[}\s,])(?:html|body|:root)\s*(?:,[^{]*)?\{[^}]*\bbackground(?:-color)?\s*:[^;}]*var\(\s*--color-background-body\b/i.test(
-          source,
-        )
-      ) {
+      if (paintsPageColor(source)) {
         painted = true;
         break;
       }
@@ -2310,11 +2404,7 @@ function oneModePageCheck(projectDir, theme) {
     // (`themeModes[…]`) or a literal `light` or `dark`: Theme marks the page
     // with that mode, and Core's reset gives it that color scheme, so the
     // text stays readable in every OS mode.)
-    if (
-      /\bmode\s*=\s*(?:["'](?:light|dark)["']|\{\s*(?:["'`](?:light|dark)["'`]|themeModes\s*\[))/.test(
-        source,
-      )
-    ) {
+    if (/\bTheme\b/.test(source) && rootThemeFixesMode(source)) {
       painted = true;
       break;
     }
