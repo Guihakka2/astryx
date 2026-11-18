@@ -493,11 +493,13 @@ one removal merged ahead of the decision to allow it.
   exception covers sharing a page as one HTML file: the CLI's two guides
   that teach it (`cli/experimental/share-a-page` and
   `cli/experimental/render-pages`) set `searchable: true`, and no other doc
-  may. Inside a project that depends on `@astryxdesign/core`, or outside any
-  package (no package.json at or above the folder), `astryx search` MAY
-  return each of them as one entry, whose own text says it is experimental;
-  inside a project without Core it never returns them, and every other
-  experimental doc stays out of search. This exception ends when that
+  may. In an Astryx project (one that installs or declares `@astryxdesign/core`
+  or `@astryxdesign/cli`), or outside any package (no package.json at or
+  above the folder), `astryx search`, the `search()` API and an index
+  `exportSearchIndex()` makes there MAY return each of them as one entry,
+  whose own text says it is experimental; in a package without Astryx none of
+  them returns the guides, and every other experimental doc stays out of
+  search. This exception ends when that
   command graduates or is removed.
 - **FR28 — A planned minor needs no prior deprecation; a patch does.** A change
   landing in a declared minor needs no deprecation path: its `[breaking]` Changeset

@@ -12,7 +12,8 @@
  *   without the icon-set feature, so a result, field, section, count, or
  *   `stability` that an experimental surface adds to search, the docs, a
  *   template copy, doctor, or an integration's verify report fails here, as
- *   does any sentence that names an experimental surface. They hold no prose
+ *   does any sentence that names an experimental surface, apart from the
+ *   shareable-page guides spec:AST-017 FR27 lets search return. They hold no prose
  *   (titles, summaries, descriptions, snippets), so main's ordinary doc and
  *   command wording edits rewrite none of them. Help, the
  *   manifest, and the `astryx docs cli` listing gain only the experimental
@@ -42,7 +43,8 @@
  * output runs `vitest run packages/cli/test/experimental-isolation.test.mjs
  * --update` in the branch itself, then reviews
  * the diff of `__golden__/no-icon-set/`: a diff that names an icon set, an
- * icon definition, or `experimental` is the leak this test exists to catch.
+ * icon definition, or `experimental` (other than the two shareable-page
+ * guides) is the leak this test exists to catch.
  */
 
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';

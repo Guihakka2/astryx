@@ -8,11 +8,7 @@
 
 import {readFileSync} from 'node:fs';
 import * as path from 'node:path';
-import {
-  coreContentDir,
-  installedProjectCoreDir,
-  realDir,
-} from '../../foundation/fs/paths.mjs';
+import {coreContentDir, realDir} from '../../foundation/fs/paths.mjs';
 import {withListingCache} from '../../foundation/fs/listing-cache.mjs';
 import {persistedGather} from '../../foundation/fs/gather-cache.mjs';
 import {
@@ -133,7 +129,11 @@ async function gatherDomains(options) {
       coreSkippedCode,
     };
     const visible = shareGuidesFor(result, cwd);
-    fromStore.set(visible, {pm: found.pm, domains: DOMAINS.filter(wants)});
+    // Only a catalog the store holds as it is is kept as a reference to the
+    // store: a filtered one is kept as its own candidates, so a later run
+    // reads back what this folder sees.
+    if (visible === result)
+      fromStore.set(visible, {pm: found.pm, domains: DOMAINS.filter(wants)});
     return visible;
   }
   const [components, hooks, docTopics, templates, themes] = await Promise.all([
@@ -162,30 +162,30 @@ async function gatherDomains(options) {
 }
 
 /**
- * The gathered catalog without the experimental shareable-page guides.
+ * The gathered catalog without the experimental shareable-page guides; the
+ * same object when it holds none.
  * @template {{all: Candidate[]}} T
  * @param {T} gathered
  * @returns {T}
  */
 export function withoutShareGuides(gathered) {
-  return {
-    ...gathered,
-    all: gathered.all.filter(c => c._experimentalGuide !== true),
-  };
+  const all = gathered.all.filter(c => c._experimentalGuide !== true);
+  return all.length === gathered.all.length ? gathered : {...gathered, all};
 }
 
 /**
  * The gathered catalog as a folder sees it: the shareable-page guides answer
- * in a project that depends on Astryx Core and outside any package, where
- * the page is the Astryx page being made (spec:AST-017 FR27). In a project
- * without Core, search gathers as if they were absent.
+ * in an Astryx project (one that installs or declares Core or the CLI) and
+ * outside any package, where the page is the Astryx page being made
+ * (spec:AST-017 FR27). In a package without Astryx, search gathers as if
+ * they were absent.
  * @template {{all: Candidate[]}} T
  * @param {T} gathered
  * @param {string} cwd
  * @returns {T}
  */
 function shareGuidesFor(gathered, cwd) {
-  return installedProjectCoreDir(cwd) || isOutsideAnyPackage(cwd)
+  return !isOutsideProject(cwd) || isOutsideAnyPackage(cwd)
     ? gathered
     : withoutShareGuides(gathered);
 }

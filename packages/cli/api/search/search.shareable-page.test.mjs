@@ -1,10 +1,11 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 /**
- * @file In a project that depends on Astryx Core, `astryx search` returns the
- * experimental guides for sharing a page as one HTML file, and still leaves
- * every other experimental doc out. Anywhere else it answers without them
- * (spec:AST-017 FR27).
+ * @file In an Astryx project (one that installs or declares Core or the CLI),
+ * and outside any package, `astryx search` returns the experimental guides
+ * for sharing a page as one HTML file, one entry each, and still leaves every
+ * other experimental doc out. In a package without Astryx it answers without
+ * them (spec:AST-017 FR27).
  */
 
 import * as fs from 'node:fs';
@@ -33,12 +34,25 @@ let astryxApp;
 let plainApp;
 /** @type {string} */
 let outside;
+/** @type {string} */
+let declared;
 
 beforeAll(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-share-guides-'));
   astryxApp = makeLinkedFixture('astryx-share-guides-app-', [
     '@astryxdesign/core',
   ]);
+  // A fresh clone: it declares Core and has installed nothing yet.
+  declared = path.join(tmp, 'declared');
+  fs.mkdirSync(declared, {recursive: true});
+  fs.writeFileSync(
+    path.join(declared, 'package.json'),
+    JSON.stringify({
+      name: 'declared',
+      private: true,
+      dependencies: {'@astryxdesign/core': '*'},
+    }),
+  );
   outside = path.join(tmp, 'outside');
   fs.mkdirSync(outside, {recursive: true});
   plainApp = path.join(tmp, 'plain');
@@ -95,6 +109,11 @@ describe('search and the shareable-page guides', () => {
       expect(isGuide(first)).toBe(true);
     },
   );
+
+  it('in a project that declares Core and has installed nothing, "single file" returns a guide first', async () => {
+    const [first] = await docs('single file', declared);
+    expect(isGuide(first)).toBe(true);
+  });
 
   it.each(['share', 'single file', 'static html'])(
     'in a project without Astryx, "%s" returns no shareable-page guide',
