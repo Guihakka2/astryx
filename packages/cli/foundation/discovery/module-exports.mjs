@@ -1818,6 +1818,64 @@ function importedElements(ast, sources, name) {
 }
 
 /**
+ * The `prop` attribute of each outermost `<Name>` element a module renders
+ * (one inside no other `<Name>`), `Name` a runtime import of `name` from one
+ * of `sources` (renames included), read without running anything: the
+ * attribute's syntax node, or null for an element without it.
+ * @param {string} file
+ * @param {{sources: ReadonlySet<string>, name: string, prop: string}} element
+ * @returns {any[]}
+ */
+export function outermostElementProps(file, {sources, name, prop}) {
+  let ast;
+  try {
+    ast = parseModule(file);
+  } catch {
+    return [];
+  }
+  const opening = new Set(importedElements(ast, sources, name));
+  if (opening.size === 0) return [];
+  /** @type {any[]} */
+  const out = [];
+  /** @param {unknown} value @param {boolean} inside */
+  const visit = (value, inside) => {
+    if (value == null || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, inside);
+      return;
+    }
+    const node = /** @type {any} */ (value);
+    let within = inside;
+    if (node.type === 'JSXElement' && opening.has(node.openingElement)) {
+      if (!inside)
+        out.push(
+          (node.openingElement.attributes ?? []).find(
+            (/** @type {any} */ item) =>
+              item.type === 'JSXAttribute' && item.name?.name === prop,
+          ) ?? null,
+        );
+      within = true;
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (
+        [
+          'loc',
+          'start',
+          'end',
+          'extra',
+          'leadingComments',
+          'trailingComments',
+        ].includes(key)
+      )
+        continue;
+      visit(child, within);
+    }
+  };
+  visit(ast.program, false);
+  return out;
+}
+
+/**
  * Whether a module renders `<Name>`, a runtime import of `name` from one of
  * `sources` (renames included), read without running anything. An import
  * that is never rendered, or a type-only one, is not.

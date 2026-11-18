@@ -23,6 +23,7 @@ import {
   doctorHex,
   doctorLuminance,
   doctorParseColor,
+  doctorOutermostElementProps,
   doctorRendersElement,
   doctorStylesheetImports,
   findDoctorInstalledPackage,
@@ -2256,82 +2257,65 @@ function paintsPageColor(css) {
 
 /**
  * Whether a module's outermost Core `Theme` elements are given a fixed mode:
- * a literal `light` or `dark`, or the theme module's `themeModes[…]`. Theme
- * marks the page with that mode, and Core's reset gives it that color
- * scheme. A Theme inside another Theme, or another component's `mode`, does
- * not count.
- * @param {string} source
+ * a literal `light` or `dark`, or, for a theme whose one mode the module
+ * records, its `themeModes[…]` entry, alone or with a fallback (`??
+ * 'system'`, as `theme add` wires it). Theme marks the page with that mode,
+ * and Core's reset gives it that color scheme. A Theme inside another Theme,
+ * or another component's `mode`, does not count.
+ * @param {string} file
+ * @param {boolean} recorded whether the module records the theme's mode
  */
-function rootThemeFixesMode(source) {
-  let ast;
-  try {
-    ast = parseModule(source);
-  } catch {
-    return false;
-  }
-  /** @type {Set<string>} */
-  const names = new Set();
-  walkAst(ast, node => {
-    if (
-      node.type === 'ImportDeclaration' &&
-      /^@astryxdesign\/core(?:\/theme|\/Theme)?$/.test(node.source?.value) &&
-      node.importKind !== 'type'
-    )
-      for (const s of node.specifiers ?? [])
-        if (s.type === 'ImportSpecifier' && s.imported?.name === 'Theme')
-          names.add(s.local.name);
-  });
-  if (!names.size) return false;
-  /** @param {any} attribute */
-  const fixed = attribute => {
+function rootThemeFixesMode(file, recorded) {
+  /** @param {any} e */
+  const literal = e =>
+    (e?.type === 'StringLiteral' && /^(?:light|dark)$/.test(e.value)) ||
+    (e?.type === 'TemplateLiteral' &&
+      !e.expressions.length &&
+      /^(?:light|dark)$/.test(e.quasis[0]?.value?.cooked ?? ''));
+  /** @param {any} e */
+  const themeModesEntry = e =>
+    e?.type === 'MemberExpression' &&
+    e.computed &&
+    e.object?.type === 'Identifier' &&
+    e.object.name === 'themeModes';
+  return doctorOutermostElementProps(file, {
+    sources: CORE_THEME_SOURCES,
+    name: 'Theme',
+    prop: 'mode',
+  }).some(attribute => {
     const v = attribute?.value;
-    if (v?.type === 'StringLiteral') return /^(?:light|dark)$/.test(v.value);
+    if (v?.type === 'StringLiteral') return literal(v);
     if (v?.type !== 'JSXExpressionContainer') return false;
     const e = v.expression;
-    if (e?.type === 'StringLiteral') return /^(?:light|dark)$/.test(e.value);
-    if (e?.type === 'TemplateLiteral' && !e.expressions.length)
-      return /^(?:light|dark)$/.test(e.quasis[0]?.value?.cooked ?? '');
+    if (literal(e)) return true;
+    if (!recorded) return false;
     return (
-      e?.type === 'MemberExpression' &&
-      e.computed &&
-      e.object?.type === 'Identifier' &&
-      e.object.name === 'themeModes'
+      themeModesEntry(e) ||
+      (e?.type === 'LogicalExpression' &&
+        e.operator === '??' &&
+        themeModesEntry(e.left))
     );
-  };
-  let found = false;
-  /** @param {unknown} value @param {boolean} inside */
-  const visit = (value, inside) => {
-    if (found || value == null || typeof value !== 'object') return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, inside);
-      return;
-    }
-    const node = /** @type {any} */ (value);
-    let within = inside;
-    if (
-      node.type === 'JSXElement' &&
-      node.openingElement?.name?.type === 'JSXIdentifier' &&
-      names.has(node.openingElement.name.name)
-    ) {
-      if (!inside) {
-        const mode = (node.openingElement.attributes ?? []).find(
-          (/** @type {any} */ a) =>
-            a.type === 'JSXAttribute' && a.name?.name === 'mode',
-        );
-        if (fixed(mode)) {
-          found = true;
-          return;
-        }
-      }
-      within = true;
-    }
-    for (const [key, child] of Object.entries(node)) {
-      if (['loc', 'start', 'end', 'extra'].includes(key)) continue;
-      visit(child, within);
-    }
-  };
-  visit(ast, false);
-  return found;
+  });
+}
+
+/**
+ * The two halves of a `light-dark(a, b)` value, split at its top-level
+ * comma so functional colors (`oklch(…)`) stay whole; null for another value.
+ * @param {string} value
+ * @returns {[string, string] | null}
+ */
+function lightDarkHalves(value) {
+  const m = /^\s*light-dark\(([\s\S]*)\)\s*$/.exec(value);
+  if (!m) return null;
+  let depth = 0;
+  for (let i = 0; i < m[1].length; i++) {
+    const ch = m[1][i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === ',' && depth === 0)
+      return [m[1].slice(0, i).trim(), m[1].slice(i + 1).trim()];
+  }
+  return null;
 }
 
 /**
@@ -2343,10 +2327,7 @@ function rootThemeFixesMode(source) {
 function oneModeOfPage(css) {
   const value = /--color-background-body\s*:\s*([^;}]+)/.exec(css)?.[1];
   if (!value) return null;
-  const pair = /^\s*light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)\s*$/.exec(
-    value,
-  );
-  const sides = (pair ? [pair[1], pair[2]] : [value]).map(lightSide);
+  const sides = (lightDarkHalves(value) ?? [value]).map(lightSide);
   if (sides.some(side => side == null)) return null;
   if (sides.some(side => side !== sides[0])) return null;
   return sides[0] ? 'light' : 'dark';
@@ -2404,7 +2385,10 @@ function oneModePageCheck(projectDir, theme) {
     // (`themeModes[…]`) or a literal `light` or `dark`: Theme marks the page
     // with that mode, and Core's reset gives it that color scheme, so the
     // text stays readable in every OS mode.)
-    if (/\bTheme\b/.test(source) && rootThemeFixesMode(source)) {
+    if (
+      /\bTheme\b/.test(source) &&
+      rootThemeFixesMode(file, Boolean(theme.mode))
+    ) {
       painted = true;
       break;
     }

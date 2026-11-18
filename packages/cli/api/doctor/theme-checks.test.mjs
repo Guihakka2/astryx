@@ -2111,6 +2111,30 @@ describe('app-theme doctor checks', () => {
     });
   });
 
+  it('reads the wiring theme add prints, and a light-dark pair of functional colors', async () => {
+    const css =
+      '[data-astryx-theme="ocean"] { --color-background-body: light-dark(oklch(0.2 0.02 250), oklch(0.25 0.02 250)); }\n';
+    const wired = await fixture([{slug: 'ocean', css}]);
+    write(
+      path.join(wired.packageDir, 'dist/ocean.js'),
+      'export const oceanTheme = {name: \'ocean\', tokens: {}};\nexport const colorModes = ["dark"];\n',
+    );
+    await themeAdd('ocean', {
+      cwd: wired.dir,
+      import: true,
+      package: '@acme/themes',
+    });
+    const bare = check(await checkAppThemes(wired.dir), 'theme-page-color');
+    expect(bare).toMatchObject({status: 'warn'});
+    write(
+      path.join(wired.dir, 'src/main.tsx'),
+      "import {Theme} from '@astryxdesign/core/theme';\nimport {themes, themeModes, defaultThemeSlug} from './astryx-themes';\nexport const Root = () => <Theme theme={themes[defaultThemeSlug]} mode={themeModes[defaultThemeSlug] ?? 'system'} />;\n",
+    );
+    expect(
+      check(await checkAppThemes(wired.dir), 'theme-page-color'),
+    ).toMatchObject({status: 'pass'});
+  });
+
   it('counts only a body background that uses the page color', async () => {
     const {dir} = await fixture([
       {
